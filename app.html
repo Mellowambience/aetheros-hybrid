@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aether — one app for your work</title>
+<style>
+:root{
+  --bg:#0e0a14; --panel:#15101d; --panel2:#1b1424; --line:#2a2030; --line2:#352a3e;
+  --text:#f3ecf5; --dim:#9a8aa6; --accent:#ff9eb5; --violet:#c9a0ff; --cyan:#7afcff; --gold:#ffd98a;
+  --ok:#7afcff; --warn:#ffc878; --bad:#ff7088;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13px;overflow:hidden}
+.top{height:46px;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#15101d,#0e0a14)}
+.title{font-weight:700;letter-spacing:.4px}
+.title small{color:var(--dim);font-weight:400;margin-left:8px;font-size:11px}
+.spacer{flex:1}
+.stat{font-family:var(--mono);font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.tab{padding:11px 14px;font-size:12px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.main{position:fixed;top:92px;left:0;right:0;bottom:0;overflow:auto;padding:18px 20px}
+.view{display:none;max-width:960px}
+.view.active{display:block}
+h2.v{margin:0 0 4px;font-size:15px;font-weight:600}
+p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-family:var(--mono);font-size:12px}
+.tag{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--line2)}
+.tag.ok{color:var(--ok);border-color:rgba(122,252,255,.4)}
+.tag.warn{color:var(--warn);border-color:rgba(255,200,120,.4)}
+.tag.bad{color:var(--bad);border-color:rgba(255,112,136,.4)}
+.log{font-family:var(--mono);font-size:12px;line-height:1.55;max-height:300px;overflow:auto}
+.m{margin:2px 0;white-space:pre-wrap;word-break:break-word}
+.m.you{color:var(--text)}.m.agent{color:var(--violet)}.m.sys{color:var(--dim)}
+.input{display:flex;gap:8px;margin-top:10px}
+.input input{flex:1;background:var(--bg);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:9px 11px;font-family:var(--mono);font-size:12px;outline:none}
+.input input:focus{border-color:var(--accent)}
+.input button{background:var(--accent);color:#0e0a14;border:none;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
+.q{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;font-family:var(--mono);font-size:12px}
+.q .box{width:16px;height:16px;border:1.5px solid var(--line2);border-radius:4px;flex:none}
+.q.done .box{background:var(--violet);border-color:var(--violet)}
+.q.done span{text-decoration:line-through;color:var(--dim)}
+.xp{font-size:30px;font-weight:700;color:var(--gold);font-family:var(--mono)}
+.tier{display:flex;flex-direction:column;gap:2px;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
+.tier .nm{font-weight:700;color:var(--accent)}
+.tier .pr{font-family:var(--mono);color:var(--gold);font-size:13px}
+.tier .ds{color:var(--dim);font-size:11px}
+.proj{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+.proj .d{color:var(--dim);font-size:11px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj{cursor:pointer}.proj:hover .nm{color:var(--accent)}
+.empty{color:var(--dim);font-style:italic;font-size:11px;padding:10px 0}
+.gate{font-size:11px;color:var(--warn);font-family:var(--mono);margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="title">AETHER <small>one app for your work</small></div>
+  <div class="spacer"></div>
+  <div class="stat" id="stHub"><span class="dot" id="dHub"></span>fleet</div>
+  <div class="stat" id="stCredit"><span class="dot" id="dCred"></span>credit</div>
+  <div class="stat" id="stPending"><span class="dot" id="dPend"></span>pending:0</div>
+</div>
+<div class="tabs">
+  <div class="tab active" data-v="fleet">Fleet</div>
+  <div class="tab" data-v="quests">Quests</div>
+  <div class="tab" data-v="credits">Credits</div>
+  <div class="tab" data-v="voice">Voice</div>
+  <div class="tab" data-v="works">Works</div>
+  <div class="tab" data-v="offer">Offerings</div>
+</div>
+<div class="main">
+  <!-- FLEET -->
+  <div class="view active" id="v-fleet">
+    <h2 class="v">Fleet Command</h2>
+    <p class="v">Commune with the fleet. External actions are held in the outbox until you send them.</p>
+    <div class="card">
+      <div class="log" id="log"></div>
+      <div class="gate">Nothing executes externally without your SEND.</div>
+      <div class="input">
+        <input id="cmd" placeholder="command the fleet…" onkeydown="if(event.key==='Enter')send()">
+        <button onclick="send()">Send</button>
+      </div>
+    </div>
+    <div class="card"><div id="outbox"><div class="empty">no pending actions</div></div></div>
+  </div>
+  <!-- QUESTS -->
+  <div class="view" id="v-quests">
+    <h2 class="v">Quests</h2>
+    <p class="v">Your real actions become quests. Complete them to earn XP. (AetherQuest loop)</p>
+    <div class="card">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+        <span class="xp" id="xp">0</span><span style="color:var(--dim);font-size:11px">XP</span>
+      </div>
+      <div id="quests"></div>
+      <div class="input">
+        <input id="qAdd" placeholder="add a quest…" onkeydown="if(event.key==='Enter')addQuest()">
+        <button onclick="addQuest()">Add</button>
+      </div>
+    </div>
+  </div>
+  <!-- CREDITS -->
+  <div class="view" id="v-credits">
+    <h2 class="v">Credits</h2>
+    <p class="v">Cloud provider credit across all monitored accounts. Honest state — no balance is inferred.</p>
+    <div class="card" id="credit"><div class="empty">loading…</div></div>
+  </div>
+  <!-- VOICE -->
+  <div class="view" id="v-voice">
+    <h2 class="v">Voice</h2>
+    <p class="v">Owner-gated local voice. Consent-bound, SHA-256 ref-audio, loopback-only, no cloud fallback.</p>
+    <div class="card">
+      <div class="row"><span>status</span><span class="tag warn" id="vStat">not installed</span></div>
+      <div class="row"><span>consent</span><span class="tag" id="vConsent">pending enrollment</span></div>
+      <div class="row"><span>fallback</span><span class="tag bad">none (by design)</span></div>
+      <div style="color:var(--dim);font-size:11px;margin-top:10px;line-height:1.5">
+        Run <span style="font-family:var(--mono)">voice/install_voice.bat</span> to enable local Qwen3-TTS. Until then the city is silent by choice.
+      </div>
+    </div>
+  </div>
+  <!-- WORKS -->
+  <div class="view" id="v-works">
+    <h2 class="v">Works</h2>
+    <p class="v">Every project you have built, indexed. Click to reveal its path. (your life's work)</p>
+    <div class="card" id="works"><div class="empty">indexing…</div></div>
+  </div>
+  <!-- OFFERINGS -->
+  <div class="view" id="v-offer">
+    <h2 class="v">Offerings</h2>
+    <p class="v">The service tiers you offer (Coinmoth model). Commission-based agent avtubers.</p>
+    <div class="card">
+      <div class="tier"><span class="nm">Spark</span><span class="pr">$25</span><span class="ds">Entry-level agent avtuber. Single voice, one persona.</span></div>
+      <div class="tier"><span class="nm">Voice</span><span class="pr">$75</span><span class="ds">Full voice agent. Custom tone, memory, multi-scene.</span></div>
+      <div class="tier"><span class="nm">Fleet</span><span class="pr">$200</span><span class="ds">Full fleet. Multiple agents, orchestration, live channel.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const END={hub:'http://127.0.0.1:8911',dispatch:'http://127.0.0.1:8912',map:'http://127.0.0.1:8913',mother:'http://127.0.0.1:8920'};
+const $=id=>document.getElementById(id);
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+function addMsg(cls,txt){const d=el('div','m '+cls);d.textContent=txt;$('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight;}
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');$('v-'+t.dataset.v).classList.add('active');
+});
+
+// fleet send
+async function send(){const i=$('cmd');const t=i.value.trim();if(!t)return;i.value='';addMsg('you',t);
+  try{const r=await fetch(END.hub+'/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+    const d=await r.json();addMsg('agent',(d.note||'')+(d.sends?' [held in outbox — awaiting SEND]':' [routed]'));if(d.sends)loadOutbox();
+  }catch(e){addMsg('sys','fleet unreachable: '+e.message);}}
+
+// outbox
+async function loadOutbox(){try{const d=await(await fetch(END.dispatch+'/outbox')).json();const c=$('outbox');c.innerHTML='';
+  setPending(d.count||0);if(!d.count){c.innerHTML='<div class="empty">no pending actions</div>';return;}
+  d.commands.forEach(o=>{const it=el('div','row');it.appendChild(el('span',null,o.text));
+    const b=el('button','tag warn','SEND');b.style.cursor='pointer';b.onclick=async()=>{await fetch(END.dispatch+'/send/'+o.id,{method:'POST'});loadOutbox();};it.appendChild(b);c.appendChild(it);});
+}catch(e){}}
+function setPending(n){const d=$('dPend');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
+
+// quests (AetherQuest loop, real store)
+async function loadQuests(){try{const d=await(await fetch('./quests.json')).json();const c=$('quests');c.innerHTML='';
+  const done=d.filter(q=>q.done).length;const xp=done*100;$('xp').textContent=xp;
+  d.forEach((q,i)=>{const r=el('div','q'+(q.done?' done':''));r.appendChild(el('div','box'));
+    r.appendChild(el('span',null,q.name));r.onclick=()=>toggleQuest(i);c.appendChild(r);});
+}catch(e){$('quests').innerHTML='<div class="empty">quest store offline</div>';}}
+async function addQuest(){const i=$('qAdd');const t=i.value.trim();if(!t)return;i.value='';
+  try{const d=await(await fetch('./quests.json')).json();d.push({name:t,added:new Date().toISOString().slice(0,19).replace('T',' '),done:false});
+    await fetch('./quests.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});loadQuests();}catch(e){addMsg('sys','cannot save quest (static server)');}}
+async function toggleQuest(i){try{const d=await(await fetch('./quests.json')).json();d[i].done=!d[i].done;
+  await fetch('./quests.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});loadQuests();}catch(e){}}
+
+// credits
+async function loadCredit(){try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
+  const t=d.totals||{};const sum=el('div','row');sum.appendChild(el('span',null,'total providers'));
+  sum.appendChild(el('span','tag',(t.providers||0)+' · '+(t.with_credit||0)+' credit'));c.appendChild(sum);
+  for(const[n,p]of Object.entries(d.providers||{})){const r=el('div','row');r.appendChild(el('span',null,n));
+    r.appendChild(el('span','tag '+(p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'),p.state));c.appendChild(r);}
+  const note=el('div','row');note.appendChild(el('span',null,'note'));note.appendChild(el('span','tag',d.cloud_routable?'routable':'local-first'));c.appendChild(note);
+  setCreditDot(d.totals);
+}catch(e){$('credit').innerHTML='<div class="empty">credit monitor offline</div>';}}
+function setCreditDot(t){const d=$('dCred');const st=(t&&t.with_credit>0)?'ok':(t&&t.no_credit>0?'warn':'bad');d.className='dot'+(st==='ok'?'':st==='warn'?' warn':' bad');}
+
+// works
+async function loadWorks(){try{const d=await(await fetch('./works.json')).json();const c=$('works');c.innerHTML='';
+  d.projects.forEach(p=>{const r=el('div','proj');r.appendChild(el('span','nm',p.name));
+    const ds=el('span','d',p.desc);r.appendChild(ds);r.title=p.path;r.onclick=()=>addMsg('sys',p.name+'\n  '+p.desc+'\n  '+p.path);c.appendChild(r);});
+}catch(e){$('works').innerHTML='<div class="empty">works index offline</div>';}}
+
+// status
+async function loadStatus(){for(const[n,u]of [['Hub',END.hub+'/fleet'],['Cred','./credit_status.json']]){
+  try{const r=await fetch(u,{cache:'no-store'});if(n==='Hub')$('dHub').className='dot'+(r.ok?'':' bad');}catch(e){if(n==='Hub')$('dHub').className='dot bad';}}}
+
+addMsg('sys','AETHER — your work, in one place. Tabs above: Fleet, Quests, Credits, Voice, Works, Offerings.');
+async function refresh(){await Promise.all([loadStatus(),loadOutbox(),loadQuests(),loadCredit(),loadWorks()]);}
+refresh();setInterval(refresh,12000);
+</script>
+</body>
+</html>
