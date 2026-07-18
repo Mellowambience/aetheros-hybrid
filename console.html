@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AetherOS Console</title>
+<style>
+:root{
+  --bg:#0c0e12; --panel:#14171d; --line:#232831; --line2:#2c313b;
+  --text:#d7dbe0; --dim:#8b929c; --accent:#6ea8fe; --warn:#e0a458; --bad:#e06262; --ok:#5fbf8f;
+  --mono:'SF Mono','JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13px;overflow:hidden}
+.top{height:44px;display:flex;align-items:center;gap:18px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.top .title{font-weight:600;letter-spacing:.3px}
+.top .spacer{flex:1}
+.stat{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+.layout{position:fixed;top:44px;left:0;right:0;bottom:0;display:grid;grid-template-columns:300px 1fr;gap:1px;background:var(--line)}
+.col{background:var(--bg);display:flex;flex-direction:column;min-height:0;overflow:auto}
+.col.right{display:grid;grid-template-rows:1fr auto;min-height:0}
+.section{border-bottom:1px solid var(--line);padding:12px 14px}
+.section h2{margin:0 0 9px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;font-family:var(--mono);font-size:12px}
+.row .k{color:var(--dim)}
+.tag{font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:3px;border:1px solid var(--line2)}
+.tag.ok{color:var(--ok);border-color:rgba(95,191,143,.4)}
+.tag.warn{color:var(--warn);border-color:rgba(224,164,88,.4)}
+.tag.bad{color:var(--bad);border-color:rgba(224,98,98,.4)}
+.peer{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:12px}
+.peer .r{color:var(--dim)}
+.console{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.log{flex:1;overflow:auto;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.55}
+.m{margin:2px 0;white-space:pre-wrap;word-break:break-word}
+.m .who{color:var(--accent);font-weight:600}
+.m.sys{color:var(--dim)} .m.you{color:var(--text)} .m.agent{color:#c4b5fd}
+.gate{border-top:1px solid var(--line);padding:8px 16px;font-size:11px;color:var(--warn);font-family:var(--mono)}
+.composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+.composer select{background:var(--bg);color:var(--text);border:1px solid var(--line2);border-radius:4px;padding:7px;font-family:var(--mono);font-size:12px}
+.composer input{flex:1;background:var(--bg);border:1px solid var(--line2);border-radius:4px;color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:12.5px;outline:none}
+.composer input:focus{border-color:var(--accent)}
+.composer button{background:var(--accent);color:#0c0e12;border:none;border-radius:4px;padding:8px 16px;font-weight:600;cursor:pointer;font-size:12px}
+.outbox{border-top:1px solid var(--line);max-height:34%;overflow:auto}
+.outbox h2{margin:0;padding:10px 14px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);font-weight:600;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0}
+.out-item{display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+.out-item .t{flex:1;color:var(--dim)}
+.out-item .send{background:transparent;color:var(--warn);border:1px solid rgba(224,164,88,.4);border-radius:4px;padding:4px 12px;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600}
+.out-item .send:hover{background:rgba(224,164,88,.12)}
+.empty{color:var(--dim);font-size:11px;font-family:var(--mono);padding:12px 14px;font-style:italic}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="title">AetherOS Console</div>
+  <div class="spacer"></div>
+  <div class="stat" id="stHub"><span class="dot" id="dHub"></span>hub:8911</div>
+  <div class="stat" id="stDispatch"><span class="dot" id="dDispatch"></span>dispatch:8912</div>
+  <div class="stat" id="stMap"><span class="dot" id="dMap"></span>map:8913</div>
+  <div class="stat" id="stPending"><span class="dot" id="dPending"></span>pending:0</div>
+</div>
+
+<div class="layout">
+  <div class="col left">
+    <div class="section">
+      <h2>System State</h2>
+      <div id="sysState"><div class="empty">loading…</div></div>
+    </div>
+    <div class="section">
+      <h2>Credit</h2>
+      <div id="credit"><div class="empty">loading…</div></div>
+    </div>
+    <div class="section">
+      <h2>Fleet Peers</h2>
+      <div id="peers"><div class="empty">loading…</div></div>
+    </div>
+  </div>
+
+  <div class="col right">
+    <div class="console">
+      <div class="log" id="log"></div>
+      <div class="gate">External actions are held in the outbox until you send them. Nothing executes externally without your approval.</div>
+      <div class="composer">
+        <select id="target">
+          <option value="auto">auto-route</option>
+          <option value="hermes">hermes</option><option value="steward">steward</option>
+          <option value="aetherdeck">aetherdeck</option><option value="aetherquest">aetherquest</option>
+          <option value="fairyos">fairyos</option><option value="echovoice">echovoice</option>
+          <option value="brain">brain</option><option value="companion">companion</option>
+        </select>
+        <input id="cmd" placeholder="command the fleet…" onkeydown="if(event.key==='Enter')send()">
+        <button onclick="send()">Send</button>
+      </div>
+    </div>
+    <div class="outbox" id="outboxWrap">
+      <h2>Outbox — pending external actions</h2>
+      <div id="outbox"><div class="empty">no pending actions</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const END={hub:'http://127.0.0.1:8911',dispatch:'http://127.0.0.1:8912',map:'http://127.0.0.1:8913',mother:'http://127.0.0.1:8920'};
+const $=id=>document.getElementById(id);
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function addMsg(cls,who,text){const d=el('div','m '+cls);if(who){const w=el('span','who',who+'  ');d.appendChild(w);}d.appendChild(document.createTextNode(text));$('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight;}
+
+async function send(){
+  const inp=$('cmd'); const t=inp.value.trim(); if(!t)return; inp.value='';
+  addMsg('you','you',t);
+  try{
+    const r=await fetch(END.hub+'/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,target:$('target').value})});
+    const d=await r.json();
+    addMsg('agent',d.routed_to||'fleet',(d.note||'')+(d.sends?'  [held in outbox — awaiting send]':'  [routed]'));
+    if(d.sends) loadOutbox();
+  }catch(e){ addMsg('sys','error','hub unreachable: '+e.message); }
+}
+
+async function loadStatus(){
+  const checks=[['hub',END.hub+'/fleet'],['dispatch',END.dispatch+'/outbox'],['map',END.map+'/map']];
+  for(const [name,url] of checks){
+    try{ const r=await fetch(url,{cache:'no-store'}); setDot('d'+name.capitalize(), r.ok?'ok':(r.status===404?'warn':'bad')); }
+    catch(e){ setDot('d'+name.capitalize(),'bad'); }
+  }
+}
+String.prototype.capitalize=function(){return this.charAt(0).toUpperCase()+this.slice(1);};
+function setDot(id,state){const d=$(id);if(!d)return;d.className='dot'+(state==='ok'?'':state==='warn'?' warn':' bad');}
+
+async function loadSys(){
+  try{const d=await(await fetch(END.map+'/map')).json();const c=$('sysState');c.innerHTML='';
+    for(const[k,n]of Object.entries(d.nodes||{})){
+      const r=el('div','row');r.appendChild(el('span','k',k));
+      const tag=el('span','tag '+(n.state==='ok'?'ok':n.state==='warn'?'warn':'bad'),n.state);
+      r.appendChild(tag);c.appendChild(r);
+      if(n.detail){const det=el('div','row');det.appendChild(el('span','k','  '+n.detail));c.appendChild(det);}
+    }
+  }catch(e){$('sysState').innerHTML='<div class="empty">map offline</div>';}
+}
+async function loadCredit(){
+  try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
+    for(const[n,p]of Object.entries(d.providers||{})){
+      const r=el('div','row');r.appendChild(el('span','k',n));
+      r.appendChild(el('span','tag '+(p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'),p.state));c.appendChild(r);
+    }
+  }catch(e){$('credit').innerHTML='<div class="empty">no credit monitor</div>';}
+}
+async function loadPeers(){
+  try{const d=await(await fetch(END.hub+'/fleet')).json();const c=$('peers');c.innerHTML='';
+    d.agents.forEach(a=>{const r=el('div','peer');r.appendChild(el('span',null,a.name));r.appendChild(el('span','r',a.role));c.appendChild(r);});
+    setPending(d.agents.length);
+  }catch(e){$('peers').innerHTML='<div class="empty">fleet offline</div>';}
+}
+async function loadOutbox(){
+  try{const d=await(await fetch(END.dispatch+'/outbox')).json();const c=$('outbox');c.innerHTML='';
+    setPending(d.count||0);
+    if(!d.count){c.innerHTML='<div class="empty">no pending actions</div>';return;}
+    d.commands.forEach(o=>{
+      const it=el('div','out-item');it.appendChild(el('span','t',o.text));
+      const b=el('button','send','SEND');b.onclick=()=>sendOut(o.id);it.appendChild(b);c.appendChild(it);
+    });
+  }catch(e){}
+}
+async function sendOut(id){try{const d=await(await fetch(END.dispatch+'/send/'+id,{method:'POST'})).json();addMsg('sys','outbox',d.note||'sent');loadOutbox();}catch(e){}}
+function setPending(n){const d=$('dPending');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
+
+addMsg('sys','console','AetherOS operator console. Command the fleet, review system state, approve pending external actions.');
+async function refresh(){await Promise.all([loadStatus(),loadSys(),loadCredit(),loadPeers(),loadOutbox()]);}
+refresh(); setInterval(refresh,10000);
+</script>
+</body>
+</html>
