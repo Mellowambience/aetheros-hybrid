@@ -28,6 +28,50 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = Path(__file__).resolve().parent
 PORT = 8911
 INBOX = HERE / "command_inbox.json"
+QUESTS = HERE / "quests.json"
+
+
+def load_quests() -> list:
+    if not QUESTS.exists():
+        return []
+    try:
+        d = json.loads(QUESTS.read_text(encoding="utf-8"))
+        return d if isinstance(d, list) else []
+    except Exception:
+        return []
+
+
+def save_quests(qs: list):
+    QUESTS.write_text(json.dumps(qs, indent=2), encoding="utf-8")
+
+
+def add_quest(name: str) -> dict:
+    name = (name or "").strip().strip(".\"")[:120]
+    if not name:
+        return {"ok": False, "error": "empty quest name"}
+    qs = load_quests()
+    qs.insert(0, {"name": name, "added": time.strftime("%Y-%m-%d %H:%M:%S"), "done": False})
+    qs = qs[:200]
+    save_quests(qs)
+    return {"ok": True, "quests": qs}
+
+
+def toggle_quest(idx: int = None, name: str = None) -> dict:
+    qs = load_quests()
+    target = None
+    if name is not None:
+        for i, q in enumerate(qs):
+            if q.get("name") == name:
+                target = i
+                break
+    elif idx is not None:
+        target = idx
+    if target is None or target < 0 or target >= len(qs):
+        return {"ok": False, "error": "no such quest"}
+    qs[target]["done"] = not qs[target].get("done", False)
+    save_quests(qs)
+    return {"ok": True, "quests": qs}
+
 
 # actions that need the human SEND gate (external / high-impact)
 EXTERNAL_KEYWORDS = ["send ", "post ", "deploy", "publish", "email", "tweet", "x.com",
@@ -105,6 +149,8 @@ class H(BaseHTTPRequestHandler):
         u = self.path.rstrip("/")
         if u in ("/health",):
             self._json({"ok": True})
+        elif u in ("/quest",):
+            self._json({"ok": True, "quests": load_quests()})
         elif u in ("/inbox",):
             rows = []
             if INBOX.exists():
@@ -123,6 +169,22 @@ class H(BaseHTTPRequestHandler):
             self.send_response(404); self.end_headers()
 
     def do_POST(self):
+        if self.path.rstrip("/") == "/quest":
+            try:
+                n = int(self.headers.get("Content-Length", 0))
+                raw = self.rfile.read(n) if n else b"{}"
+                data = json.loads(raw or b"{}")
+                action = (data.get("action") or "add").lower()
+                if action == "add":
+                    res = add_quest(data.get("name", ""))
+                elif action == "toggle":
+                    res = toggle_quest(idx=data.get("index"), name=data.get("name"))
+                else:
+                    res = {"ok": False, "error": "unknown action"}
+                self._json(res, 200 if res.get("ok") else 400)
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)}, 400)
+            return
         if self.path.rstrip("/") == "/add-agent":
             try:
                 n = int(self.headers.get("Content-Length", 0))

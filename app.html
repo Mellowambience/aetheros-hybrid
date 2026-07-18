@@ -170,17 +170,19 @@ async function loadOutbox(){try{const d=await(await fetch(END.dispatch+'/outbox'
 }catch(e){}}
 function setPending(n){const d=$('dPend');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
 
-// quests (AetherQuest loop, real store)
-async function loadQuests(){try{const d=await(await fetch('./quests.json')).json();const c=$('quests');c.innerHTML='';
-  const done=d.filter(q=>q.done).length;const xp=done*100;$('xp').textContent=xp;
-  d.forEach((q,i)=>{const r=el('div','q'+(q.done?' done':''));r.appendChild(el('div','box'));
+// quests (AetherQuest loop, real store via /quest API)
+async function loadQuests(){try{const d=await(await fetch(END.hub+'/quest')).json();const c=$('quests');c.innerHTML='';
+  const qs=d.quests||[];const done=qs.filter(q=>q.done).length;$('xp').textContent=done*100;
+  qs.forEach((q,i)=>{const r=el('div','q'+(q.done?' done':''));r.appendChild(el('div','box'));
     r.appendChild(el('span',null,q.name));r.onclick=()=>toggleQuest(i);c.appendChild(r);});
+  if(!qs.length)c.innerHTML='<div class="empty">no quests yet — add one below</div>';
 }catch(e){$('quests').innerHTML='<div class="empty">quest store offline</div>';}}
 async function addQuest(){const i=$('qAdd');const t=i.value.trim();if(!t)return;i.value='';
-  try{const d=await(await fetch('./quests.json')).json();d.push({name:t,added:new Date().toISOString().slice(0,19).replace('T',' '),done:false});
-    await fetch('./quests.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});loadQuests();}catch(e){addMsg('sys','cannot save quest (static server)');}}
-async function toggleQuest(i){try{const d=await(await fetch('./quests.json')).json();d[i].done=!d[i].done;
-  await fetch('./quests.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});loadQuests();}catch(e){}}
+  try{const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name:t})})).json();
+    if(d.ok)loadQuests();else addMsg('sys','quest error: '+(d.error||'unknown'));}catch(e){addMsg('sys','cannot reach quest API');}}
+async function toggleQuest(i){try{const qs=(await(await fetch(END.hub+'/quest')).json()).quests||[];const name=qs[i]&&qs[i].name;if(!name)return;
+  const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'toggle',name:name})})).json();
+  if(d.ok)loadQuests();}catch(e){}}
 
 // credits
 async function loadCredit(){try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
