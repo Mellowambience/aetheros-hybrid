@@ -47,6 +47,9 @@ def main():
     # 10) works indexer — converge the user's life's work into works.json (one-shot at boot)
     spawn([PY, "works_index.py"], "works-index")
 
+    # 11) game console — bootable console + Agent TV host on :8914
+    children["gameconsole"] = spawn([PY, "game_console.py"], "game-console")
+
     if "--once" in sys.argv:
         print("[supervisor] --once: children launched; exiting.")
         return
@@ -74,6 +77,8 @@ def main():
                         children[name] = spawn([PY, "dispatch.py"], name)
                     elif name == "sysmap":
                         children[name] = spawn([PY, "system_map.py"], name)
+                    elif name == "gameconsole":
+                        children[name] = spawn([PY, "game_console.py"], name)
                     else:
                         children[name] = spawn([PY, "launcher.py"], name)
     except KeyboardInterrupt:

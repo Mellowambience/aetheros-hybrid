@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Incubated Game — Agent TV</title>
+<style>
+  :root{--bg:#0a0710;--panel:#120c1c;--line:#2a2036;--ink:#e8e2f0;--dim:#8a7fa0;
+        --accent:#ff9eb5;--violet:#c9a0ff;--cyan:#7afcff;--ok:#5fe39a;--warn:#ffcf6b;--bad:#ff7a8a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,sans-serif}
+  .wrap{display:flex;height:100vh}
+  .stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 120% at 50% 0%,#160f22,#0a0710)}
+  canvas{background:#07050c;border:1px solid var(--line);border-radius:10px;max-width:100%;height:auto}
+  .side{width:300px;border-left:1px solid var(--line);background:var(--panel);padding:12px;overflow:auto}
+  h3{margin:2px 0 8px;font-size:12px;color:var(--dim);letter-spacing:.04em;text-transform:uppercase}
+  .row{display:flex;justify-content:space-between;font-family:ui-monospace,monospace;font-size:11px;padding:2px 0}
+  .pill{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:20px;font-size:11px;margin-bottom:8px}
+  .pill.on{color:var(--ok);border-color:rgba(95,227,154,.4)}
+  .pill.off{color:var(--dim)}
+  #dbg{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--cyan);white-space:pre-wrap;
+       height:240px;overflow:auto;background:#07050c;border:1px solid var(--line);border-radius:8px;padding:8px}
+  .kpi{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+  .kpi div{border:1px solid var(--line);border-radius:8px;padding:6px}
+  .kpi b{display:block;font-size:18px;font-family:ui-monospace,monospace}
+  .btn{cursor:pointer;background:transparent;border:1px solid var(--line);color:var(--ink);
+       border-radius:6px;padding:5px 10px;font-size:12px}
+  .btn:hover{border-color:var(--violet)}
+  .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--cyan))}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <canvas id="cv" width="640" height="420"></canvas>
+  </div>
+  <div class="side">
+    <h3>Agent TV · Incubated Game</h3>
+    <span id="live" class="pill off">agent: idle</span>
+    <div class="kpi">
+      <div><b id="kFps">0</b>fps</div>
+      <div><b id="kScore">0</b>score</div>
+      <div><b id="kOrb">0</b>orbs left</div>
+      <div><b id="kHp">100</b>hp</div>
+    </div>
+    <div class="bar"><i id="hpBar" style="width:100%"></i></div>
+    <h3 style="margin-top:12px">Agent Debug Stream</h3>
+    <div id="dbg"></div>
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button class="btn" id="bAuto">Start Agent</button>
+      <button class="btn" id="bHuman">Human</button>
+    </div>
+    <div id="notes" style="margin-top:10px;font-size:11px;color:var(--dim)"></div>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=cv.width,H=cv.height;
+const dbg=document.getElementById('dbg');
+function log(s){const t=new Date().toLocaleTimeString();dbg.textContent=(t+' '+s+'\n'+dbg.textContent).slice(0,4000);}
+// world
+let player={x:W/2,y:H/2,vx:0,vy:0,hp:100};
+let orbs=[],haz=[],score=0,fps=0,last=performance.now(),frames=0,fpsT=0;
+let agentOn=false, errCount=0;
+function rand(a,b){return a+Math.random()*(b-a);}
+function spawnOrb(){orbs.push({x:rand(20,W-20),y:rand(20,H-20),r:7,t:0});}
+function spawnHaz(){const edge=Math.floor(rand(0,4));let x,y;
+  if(edge===0){x=rand(0,W);y=-10;}else if(edge===1){x=rand(0,W);y=H+10;}
+  else if(edge===2){x=-10;y=rand(0,H);}else{x=W+10;y=rand(0,H);}
+  const tx=player.x,ty=player.y;const a=Math.atan2(ty-y,tx-x);
+  const sp=rand(0.7,1.3);haz.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:9});}
+for(let i=0;i<6;i++)spawnOrb();
+for(let i=0;i<3;i++)spawnHaz();
+log('world init: 6 orbs, 3 hazards. agent idle.');
+// agent autopilot: nearest orb -> steer; if hazard within 70px -> flee
+function agentThink(){
+  try{
+    let nearest=null,nd=1e9;
+    for(const o of orbs){const d=Math.hypot(o.x-player.x,o.y-player.y);if(d<nd){nd=d;nearest=o;}}
+    let ax=0,ay=0;
+    if(nearest){ax=nearest.x-player.x;ay=nearest.y-player.y;}
+    // flee hazards
+    let threat=null,td=1e9;
+    for(const h of haz){const d=Math.hypot(h.x-player.x,h.y-player.y);if(d<td){td=d;threat=h;}}
+    if(threat&&td<80){ax=player.x-threat.x;ay=player.y-threat.y;log('AGENT: hazard '+td.toFixed(0)+'px -> flee');}
+    const m=Math.hypot(ax,ay)||1;
+    player.vx=ax/m*2.4;player.vy=ay/m*2.4;
+    if(Math.random()<0.06)log('AGENT: target '+(nearest?'orb@'+nearest.x.toFixed(0)+','+nearest.y.toFixed(0):'none')+' dist '+nd.toFixed(0));
+  }catch(e){errCount++;log('AGENT ERROR: '+e.message);}
+}
+function step(dt){
+  if(agentOn)agentThink();
+  // human control fallback handled by key state
+  player.x+=player.vx;player.y+=player.vy;
+  player.x=Math.max(8,Math.min(W-8,player.x));player.y=Math.max(8,Math.min(H-8,player.y));
+  for(const o of orbs){o.t+=dt;
+    if(Math.hypot(o.x-player.x,o.y-player.y)<o.r+9){score++;o.dead=true;log('collect orb (+1) score='+score);
+      if(orbs.filter(x=>!x.dead).length<6)spawnOrb();}}
+  for(const h of haz){h.x+=h.vx;h.y+=h.vy;
+    if(Math.hypot(h.x-player.x,h.y-player.y)<h.r+9){player.hp-=8;h.dead=true;log('HIT! hp='+Math.max(0,player.hp));spawnHaz();
+      if(player.hp<=0){player.hp=100;score=Math.max(0,score-3);log('respawn (score -3)');}}}
+  orbs=orbs.filter(o=>!o.dead);haz=haz.filter(h=>!h.dead);
+  if(haz.length<3)spawnHaz();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  for(const o of orbs){ctx.fillStyle='#7afcff';ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,7);ctx.fill();}
+  for(const h of haz){ctx.fillStyle='#ff7a8a';ctx.beginPath();ctx.arc(h.x,h.y,h.r,0,7);ctx.fill();}
+  ctx.fillStyle=player.hp>30?'#ffd98a':'#ff7a8a';ctx.beginPath();ctx.arc(player.x,player.y,10,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.12)';ctx.beginPath();ctx.arc(player.x,player.y,28,0,7);ctx.stroke();
+}
+function loop(){
+  const now=performance.now();let dt=(now-last)/1000;if(dt>0.05)dt=0.05;last=now;
+  try{step(dt);draw();}catch(e){errCount++;log('LOOP ERROR: '+e.message);}
+  frames++;fpsT+=dt;if(fpsT>=0.5){fps=Math.round(frames/fpsT);frames=0;fpsT=0;
+    document.getElementById('kFps').textContent=fps;
+    document.getElementById('kScore').textContent=score;
+    document.getElementById('kOrb').textContent=orbs.length;
+    document.getElementById('kHp').textContent=player.hp;
+    document.getElementById('hpBar').style.width=player.hp+'%';}
+  requestAnimationFrame(loop);
+}
+loop();
+// controls
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+setInterval(()=>{if(agentOn)return;let ax=0,ay=0;
+  if(keys['arrowleft']||keys['a'])ax-=2.4;if(keys['arrowright']||keys['d'])ax+=2.4;
+  if(keys['arrowup']||keys['w'])ay-=2.4;if(keys['arrowdown']||keys['s'])ay+=2.4;
+  player.vx=ax;player.vy=ay;},16);
+document.getElementById('bAuto').onclick=()=>{agentOn=!agentOn;
+  document.getElementById('bAuto').textContent=agentOn?'Stop Agent':'Start Agent';
+  const p=document.getElementById('live');p.className='pill '+(agentOn?'on':'off');
+  p.textContent=agentOn?'agent: autopilot':'agent: idle';
+  log(agentOn?'AGENT engaged (autopilot on). watch for bugs.':'agent disengaged.');};
+document.getElementById('bHuman').onclick=()=>{agentOn=false;
+  document.getElementById('bAuto').textContent='Start Agent';
+  const p=document.getElementById('live');p.className='pill off';p.textContent='agent: idle (human)';
+  log('human control mode (arrow keys / WASD).');};
+// expose state for the console host to read (debug notes)
+window.__game={get state(){return{score,fps,hp:player.hp,orbs:orbs.length,haz:haz.length,agentOn,errCount};}};
+log('ready. start the agent and watch this stream for what needs fixing.');
+</script>
+</body>
+</html>

@@ -115,11 +115,26 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
       </div>
     </div>
   </div>
-  <!-- CREDITS -->
+  <!-- AGENT TV + GAME CONSOLE -->
   <div class="view" id="v-credits">
-    <h2 class="v">Credits</h2>
-    <p class="v">Cloud provider credit across all monitored accounts. Honest state — no balance is inferred.</p>
-    <div class="card" id="credit"><div class="empty">loading…</div></div>
+    <h2 class="v">Agent TV · Game Console</h2>
+    <p class="v">Incubate games, let agents play them on the TV, and watch the live debug stream to see what needs fixing — fast. Boot targets are real local processes.</p>
+    <div class="card" style="padding:12px">
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">Bootable Console</h3>
+      <div id="consoleList" class="card" style="border:1px solid var(--line);margin-bottom:10px">loading…</div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">Agent TV (live)</h3>
+      <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#07050c">
+        <iframe id="tvFrame" src="http://127.0.0.1:8914/game" style="width:100%;height:320px;border:0;background:#07050c" title="Agent TV"></iframe>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="tag" style="cursor:pointer" onclick="tvLoad('game')">Incubated Game</button>
+        <button class="tag" style="cursor:pointer" onclick="tvLoad('tv')">Agent TV Hub</button>
+        <button class="tag" style="cursor:pointer" onclick="tvLoad('console')">Becoming Console</button>
+      </div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:12px 0 4px">Watch Notes (what to debug)</h3>
+      <div id="watchNotes" class="card" style="border:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--cyan);min-height:60px">boot a target, then watch the game's debug stream.</div>
+      <div id="creditStrip" style="margin-top:10px;font-size:11px;color:var(--dim);border-top:1px solid var(--line);padding-top:8px">cloud credit: <span id="cCreditMini">…</span></div>
+    </div>
   </div>
   <!-- VOICE -->
   <div class="view" id="v-voice">
@@ -205,7 +220,30 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(t.dataset.v==='quests'){loadQuests();window.__questTimer=setInterval(loadQuests,2000);}
   if(t.dataset.v==='command'){loadCommand();window.__cmdTimer=setInterval(loadCommand,2000);}
   if(t.dataset.v==='strategy'){loadVision();loadStrategy();window.__stratTimer=setInterval(loadStrategy,2000);}
+  if(t.dataset.v==='credits'){loadConsole();window.__consoleTimer=setInterval(loadConsole,3000);}
 });
+
+// ---- AGENT TV + GAME CONSOLE ----
+const CON='http://127.0.0.1:8914';
+async function loadConsole(){try{
+  const d=await(await fetch(CON+'/list?t='+Date.now(),{cache:'no-store'})).json();
+  const c=$('consoleList');c.innerHTML='';
+  d.targets.forEach(tg=>{const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)';
+    row.innerHTML='<span style="width:10px;height:10px;border-radius:50%;flex:none;background:'+(tg.running?'var(--ok)':'var(--line2)')+'"></span>'+
+      '<span style="flex:1"><b>'+tg.name+'</b> <span style="color:var(--dim);font-size:11px">— '+tg.desc+'</span></span>'+
+      (tg.pid?'<span style="font-family:var(--mono);font-size:10px;color:var(--dim)">pid '+tg.pid+'</span>':'');
+    const b=document.createElement('button');b.className='tag';b.style.cursor='pointer';
+    b.textContent=tg.running?'Stop':'Boot';b.onclick=async()=>{b.textContent='…';const r=await fetch(CON+(tg.running?'/stop':'/boot'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:tg.key})});const j=await r.json();if(j.ok){loadConsole();if(tg.running===false)tvLoad(tg.key);} };
+    row.appendChild(b);c.appendChild(row);});
+  // credit mini (honest: from credit_status.json)
+  try{const cr=await(await fetch('./credit_status.json?t='+Date.now(),{cache:'no-store'})).json();
+    const provs=cr.providers||{};const states=Object.values(provs).map(p=>p.state);
+    $('cCreditMini').textContent=states.includes('with_credit')?'available':(states.includes('no_credit')?'none (zyloo 402)':'not configured');}catch(e){$('cCreditMini').textContent='unknown';}
+}catch(e){$('consoleList').innerHTML='<div class="empty">console host offline (8914)</div>';}}
+function tvLoad(key){const map={game:'http://127.0.0.1:8914/game',tv:'http://127.0.0.1:8901/',console:'http://127.0.0.1:8746/'};
+  const url=map[key];if(!url){$('watchNotes').textContent='no url for '+key;$('tvFrame').src='about:blank';return;}
+  $('tvFrame').src=url;$('watchNotes').textContent='watching: '+key+' → '+url+'. open it, start the agent, and read the debug stream.';}
+
 
 // fleet send
 async function send(){const i=$('cmd');const t=i.value.trim();if(!t)return;i.value='';addMsg('you',t);
