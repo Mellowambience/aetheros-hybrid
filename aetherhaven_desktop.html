@@ -110,10 +110,18 @@ body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px var(--glow),inset 0 1px 4px rgba(255,255,255,.6);transition:transform .15s}
 .launcher:hover{transform:scale(1.08)}
 .shelfPins{display:flex;gap:7px;align-items:center}
-.shelfPins .pin{width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,0.16);cursor:pointer;font-size:18px;
+.shelfPins .pin{width:42px;height:42px;border-radius:13px;border:1px solid rgba(255,255,255,0.16);cursor:pointer;font-size:18px;position:relative;
   display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);transition:transform .12s,background .12s}
 .shelfPins .pin:hover{transform:translateY(-3px);background:rgba(255,255,255,0.18)}
-.shelfPins .pin.active{background:linear-gradient(135deg,var(--accent),var(--violet));box-shadow:0 0 14px var(--glow)}
+.shelfPins .pin .pico{line-height:1}
+.shelfPins .pin .rdot{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);opacity:0;transition:.15s}
+.shelfPins .pin.running .rdot{opacity:1}
+.shelfPins .pin.running{background:rgba(255,255,255,0.16)}
+.shelfPins .pin.active{background:linear-gradient(135deg,var(--accent),var(--violet));box-shadow:0 0 14px var(--glow),inset 0 1px 3px rgba(255,255,255,.5)}
+.shelfPins .pin.active .rdot{background:#fff;box-shadow:0 0 6px #fff}
+.bar .min{margin-left:auto;cursor:pointer;opacity:.7;font-size:16px;line-height:1;padding:0 6px}
+.bar .min:hover{opacity:1;color:var(--accent)}
+.shelfPins .pin.active .rdot{background:#fff;box-shadow:0 0 6px #fff}
 .shelfRight{display:flex;align-items:center;gap:8px;margin-left:6px;padding-left:10px;border-left:1px solid rgba(255,255,255,0.14)}
 .shelfChat{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,0.18);cursor:pointer;font-size:17px;
   background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
@@ -390,15 +398,19 @@ function setDensity(d){density=d;if(d==='compact')document.body.setAttribute('da
 // ============ WINDOWS ============
 const desktop=document.getElementById('desktop');
 function buildWins(){
+  const firstBoot=!localStorage.getItem('ah_booted');
   DEFAULT_WINS.forEach(w=>{
     const st=winState[w.id]||{};
     const el=document.createElement('div'); el.className='win'; el.id='win_'+w.id;
     el.style.left=(st.x??w.x)+'px'; el.style.top=(st.y??w.y)+'px';
     el.style.width=(st.w??w.w)+'px'; el.style.height=(st.h??w.h)+'px';
-    const hidden=st.hidden, collapsed=st.collapsed;
+    // ChromeOS boot: on first visit, all apps start minimized into the shelf (clean desktop)
+    const hidden = firstBoot ? true : (st.hidden || false);
+    const collapsed = firstBoot ? false : (st.collapsed || false);
     if(hidden) el.style.display='none'; if(collapsed) el.classList.add('collapsed');
     el.innerHTML=`<div class="bar" ondblclick="toggleWin('${w.id}')">
         <span class="led"></span><span>${w.title}</span>
+        <span class="min" onclick="event.stopPropagation();minimizeWin('${w.id}')" title='Minimize'>▁</span>
         <span class="x" onclick="event.stopPropagation();closeWin('${w.id}')">✕</span></div>
       <div class="body" id="body_${w.id}">loading…</div>`;
     desktop.appendChild(el);
@@ -456,10 +468,13 @@ async function addAgent(){
     }
   }catch(e){msg.textContent=e.message;msg.style.color='var(--amber)';}
 }
-function activate(id){document.querySelectorAll('.win').forEach(w=>w.classList.remove('active'));document.getElementById('win_'+id)?.classList.add('active');}
-function closeWin(id){const el=document.getElementById('win_'+id); if(el) el.style.display='none'; winState[id]=Object.assign(winState[id]||{},{hidden:true}); saveWin();}
+function activate(id){document.querySelectorAll('.win').forEach(w=>w.classList.remove('active'));document.getElementById('win_'+id)?.classList.add('active');syncShelf();}
+function closeWin(id){const el=document.getElementById('win_'+id); if(el) el.style.display='none'; winState[id]=Object.assign(winState[id]||{},{hidden:true}); saveWin();syncShelf();}
+function minimizeWin(id){const el=document.getElementById('win_'+id); if(el){el.style.display='none'; winState[id]=Object.assign(winState[id]||{},{hidden:true}); saveWin();syncShelf();}}
 function toggleWin(id){const el=document.getElementById('win_'+id); if(el){el.classList.toggle('collapsed'); winState[id]=Object.assign(winState[id]||{},{collapsed:el.classList.contains('collapsed')}); saveWin();}}
-function showWin(id){const el=document.getElementById('win_'+id); if(el){el.style.display='flex'; if(el.classList.contains('collapsed'))toggleWin(id); winState[id]=Object.assign(winState[id]||{},{hidden:false}); saveWin();}}
+function showWin(id){const el=document.getElementById('win_'+id); if(el){el.style.display='flex'; if(el.classList.contains('collapsed'))toggleWin(id); winState[id]=Object.assign(winState[id]||{},{hidden:false}); saveWin();syncShelf();activate(id);}}
+// toggle: if open+active -> minimize; else show+activate (ChromeOS shelf click)
+function shelfToggle(id){const el=document.getElementById('win_'+id); if(!el)return; if(el.style.display!=='none' && el.classList.contains('active')){minimizeWin(id);} else {showWin(id);}}
 function saveWin(){for(const w of DEFAULT_WINS){const el=document.getElementById('win_'+w.id); if(el) winState[w.id]=Object.assign(winState[w.id]||{},{x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight,hidden:el.style.display==='none',collapsed:el.classList.contains('collapsed')});} localStorage.setItem(LS.win,JSON.stringify(winState));}
 // single shared drag controller — robust against re-binding
 let _drag=null; // {el, alsoMove, ox, oy}
@@ -478,20 +493,39 @@ document.onmousemove=(e)=>{
 };
 document.onmouseup=()=>{ if(_drag){_drag=null; saveWin(); } };
 function buildShelf(){
-  // One primary nav: launcher (🔘) is the single "where do I go" surface.
-  // Shelf carries only: launcher (in HTML), chat, and a living presence dot.
+  // ChromeOS-Flex taskbar: a persistent icon per app. Click toggles minimize/restore.
+  // Running apps show a dot; the active app is highlighted. Launcher + chat flank it.
   const pins=document.getElementById('shelfPins'); pins.innerHTML='';
+  DEFAULT_WINS.forEach(w=>{
+    const ico=(w.title.match(/[🀀-🿿⚀-⚿\u{1F300}-\u{1FAFF}]/u)||['●'])[0];
+    const b=document.createElement('button'); b.className='pin'; b.dataset.id=w.id;
+    b.title=w.title.replace(/^[^A-Za-z]+/,'');
+    b.innerHTML=`<span class="pico">${ico}</span><span class="rdot"></span>`;
+    b.onclick=()=>shelfToggle(w.id);
+    pins.appendChild(b);
+  });
   const chat=document.createElement('button'); chat.className='pin'; chat.textContent='💬';
   chat.title='Open Fleet Comms'; chat.onclick=()=>openBubble(); pins.appendChild(chat);
   const pres=document.createElement('button'); pres.className='pin presence'; pres.id='presenceDot';
   pres.title='System presence — click for System Map'; pres.textContent='◉';
   pres.onclick=()=>{showWin('sysmap');activate('sysmap');}; pins.appendChild(pres);
+  syncShelf();
 }
-function markPin(id){}
+// reflect running/active state on the shelf (ChromeOS taskbar behavior)
+function syncShelf(){
+  DEFAULT_WINS.forEach(w=>{
+    const el=document.getElementById('win_'+w.id); const pin=document.querySelector('.pin[data-id="'+w.id+'"]');
+    if(!el||!pin)return;
+    const open=el.style.display!=='none';
+    pin.classList.toggle('running',open);
+    pin.classList.toggle('active',open && el.classList.contains('active'));
+  });
+}
+function markPin(id){syncShelf();}
 function buildLauncher(){
   const grid=document.getElementById('appGrid'); grid.innerHTML='';
   const apps=[
-    ...DEFAULT_WINS.map(w=>({ico:(w.title.match(/[🀀-🿿⚀-⚿\u{1F300}-\u{1FAFF}]/u)||['●'])[0],nm:w.title.replace(/^[^\w]+/,''),sub:'realm',go:()=>{showWin(w.id);activate(w.id);markPin(w.id);toggleLauncher();}})),
+    ...DEFAULT_WINS.map(w=>({ico:(w.title.match(/[🀀-🿿⚀-⚿\u{1F300}-\u{1FAFF}]/u)||['●'])[0],nm:w.title.replace(/^[^\w]+/,''),sub:'realm',go:()=>{shelfToggle(w.id);toggleLauncher();}})),
     {ico:'💬',nm:'Assistant',sub:'talk to fleet',go:()=>{toggleLauncher();openBubble();}},
     {ico:'🎨',nm:'Themes',sub:'customize',go:()=>{toggleLauncher();openSettings();}},
     {ico:'🔁',nm:'Curate',sub:'reset cards',go:()=>{toggleLauncher();resetCuration();}},
@@ -805,8 +839,10 @@ setDensity(density);
 renderStatic();
 
 buildWins();
+// ChromeOS-Flex boot: open apps live in the shelf; desktop starts clean (launcher = home).
+// On first ever visit, show the launcher so the user lands on the home screen, not a cluttered desk.
+if(!localStorage.getItem('ah_booted')){ localStorage.setItem('ah_booted','1'); toggleLauncher(); }
 loadAll();setInterval(loadAll,12000);
-renderStatic();
 function renderStatic(){
   setBody('voice','<div class="txt">Local Qwen3-TTS. Owner-gated consent (SHA-256 ref-audio). Start Echo Voice to enable — <b>no cloud fallback</b> by design.</div>');
   setBody('fleet','<div class="txt">8 peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>');
