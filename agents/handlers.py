@@ -59,7 +59,33 @@ def _theme_request(text: str) -> str:
     return "theme request recorded" + (f" ({colors[0]})" if colors else "")
 
 
-def handle(agent_id: str, text: str) -> dict:
+def _repo_probe(repo: str) -> str:
+    """Real local action for an approved repo-backed quest: open the repo, report
+    its state. Safe, local-only (no network). For git repos: status. Else: top files."""
+    from pathlib import Path as _P
+    p = _P(repo)
+    if not p.exists():
+        return f"repo not found: {repo}"
+    if (p / ".git").exists():
+        try:
+            import subprocess
+            out = subprocess.run(["git", "-C", str(p), "status", "--short"],
+                                 capture_output=True, text=True, timeout=10)
+            lines = [l for l in out.stdout.splitlines() if l.strip()]
+            if not lines:
+                return f"{p.name}: clean git tree (nothing uncommitted)"
+            return f"{p.name}: {len(lines)} uncommitted change(s) — " + "; ".join(lines[:3])
+        except Exception as e:
+            return f"git probe failed: {e}"
+    # non-git repo: list what's there
+    try:
+        items = sorted([x.name for x in p.iterdir() if not x.name.startswith('.')])[:8]
+        return f"{p.name}: {len(items)} top items — " + ", ".join(items)
+    except Exception as e:
+        return f"list failed: {e}"
+
+
+def handle(agent_id: str, text: str, repo: str = "") -> dict:
     """Perform the local side-effect for a T0/T1 command. Returns {ok, detail}."""
     try:
         if agent_id == "aetherquest":
@@ -72,6 +98,8 @@ def handle(agent_id: str, text: str) -> dict:
             detail = "knowledge note recorded"
         elif agent_id == "companion":
             detail = "companion reflection logged"
+        elif text.startswith("[quest:approved]") and repo:
+            detail = _repo_probe(repo)
         else:
             detail = f"{agent_id} handled (logged)"
         _log(agent_id, text, detail)

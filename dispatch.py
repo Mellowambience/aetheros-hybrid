@@ -47,7 +47,8 @@ def process_pending() -> dict:
     done, skipped = 0, 0
     for r in rows:
         if r.get("status") == "queued":
-            res = H.handle(r.get("agent_id") or "hermes", r.get("text", ""))
+            res = H.handle(r.get("agent_id") or "hermes", r.get("text", ""),
+                           repo=r.get("repo", ""))
             r["status"] = "executed" if res.get("ok") else "error"
             r["exec_detail"] = res.get("detail", "")
             r["executed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")

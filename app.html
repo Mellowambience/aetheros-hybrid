@@ -117,6 +117,10 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
         <input id="qAdd" placeholder="add a quest…" onkeydown="if(event.key==='Enter')addQuest()">
         <button onclick="addQuest()">Add</button>
       </div>
+      <div style="margin-top:14px">
+        <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">How quests form · Alters' next wants</h3>
+        <div id="council" class="card" style="border:1px solid var(--line)">loading…</div>
+      </div>
     </div>
   </div>
   <!-- AGENT TV + GAME CONSOLE -->
@@ -221,7 +225,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   if(window.__questTimer){clearInterval(window.__questTimer);window.__questTimer=null;}
   if(window.__cmdTimer){clearInterval(window.__cmdTimer);window.__cmdTimer=null;}
   if(window.__stratTimer){clearInterval(window.__stratTimer);window.__stratTimer=null;}
-  if(t.dataset.v==='quests'){loadQuests();window.__questTimer=setInterval(loadQuests,2000);}
+  if(t.dataset.v==='quests'){loadQuests();loadCouncil();window.__questTimer=setInterval(()=>{loadQuests();loadCouncil();},2000);}
   if(t.dataset.v==='command'){loadCommand();window.__cmdTimer=setInterval(loadCommand,2000);}
   if(t.dataset.v==='strategy'){loadVision();loadStrategy();window.__stratTimer=setInterval(loadStrategy,2000);}
   if(t.dataset.v==='credits'){loadConsole();window.__consoleTimer=setInterval(loadConsole,3000);}
@@ -316,6 +320,31 @@ async function approveQuest(name){try{
 async function proposeInitiatives(){try{
   const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'propose'})})).json();
   if(d.ok){loadQuests();addMsg('agent','proposed '+(d.made||[]).length+' initiative(s) from your repos');}else addMsg('sys','propose failed: '+(d.error||''));}catch(e){addMsg('sys','cannot reach quest API');}}
+async function loadCouncil(){try{
+  const d=await(await fetch(END.hub+'/quest/formation')).json();
+  const c=$('council');c.innerHTML='';
+  const why=el('div','qmeta','Quests form from real signals: stale repos with uncommitted changes, alters with no recent activity, agent ideas from your 48 repos, or your manual add.');
+  c.appendChild(why);
+  // pending formations (provenance)
+  if(d.pending_formations&&d.pending_formations.length){
+    const h=el('div','qmeta','Pending formations:');h.style.marginTop='6px';c.appendChild(h);
+    d.pending_formations.forEach(f=>{const r=el('div','q');r.appendChild(el('div','box'));
+      const m=el('div');m.style.flex='1';const top=el('div');top.style.display='flex';top.style.gap='8px';top.style.alignItems='center';
+      top.appendChild(el('span',null,f.name));const tag=el('span','tag','stale');tag.style.cssText='font-size:10px;color:var(--warn);border-color:rgba(255,158,181,.4)';top.appendChild(tag);
+      m.appendChild(top);m.appendChild(el('div','qmeta',f.why));r.appendChild(m);
+      r.onclick=()=>{addQuestFromText(f.name);};c.appendChild(r);});
+  } else {
+    const r=el('div','qmeta','No stale repos right now — formation is quiet.');r.style.marginTop='4px';c.appendChild(r);
+  }
+  // alters' next wants
+  const h2=el('div','qmeta','Alters want next:');h2.style.marginTop='8px';c.appendChild(h2);
+  (d.alters||[]).forEach(a=>{const r=el('div','q');r.appendChild(el('div','box'));
+    const m=el('div');m.style.flex='1';const top=el('div');top.style.display='flex';top.style.gap='8px';top.style.alignItems='center';
+    top.appendChild(el('span',null,a.name+' · '+a.role));
+    const dot=el('span','pct',a.active?'active':'idle');dot.style.color=a.active?'var(--ok)':'var(--dim)';top.appendChild(dot);
+    m.appendChild(top);m.appendChild(el('div','qmeta',a.wants));r.appendChild(m);c.appendChild(r);});
+}catch(e){$('council').innerHTML='<div class="empty">council offline</div>';}}
+async function addQuestFromText(name){try{i=$('qAdd');i.value=name;addQuest();}catch(e){}}
 
 // credits
 async function loadCredit(){try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';

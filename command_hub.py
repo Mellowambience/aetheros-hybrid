@@ -96,6 +96,71 @@ def propose_initiatives() -> dict:
     return {"ok": True, "made": made}
 
 
+def formation_report() -> dict:
+    """How new quests form + what each alter (fleet peer) wants next.
+
+    Quest formation is NOT random — it is driven by real signals:
+      1. STALE REPO  — a repo in works.json with uncommitted git changes or no recent
+                       agent_activity touch -> forms 'work on <repo>' (approval lane).
+      2. PEER GAP    — an alter with 0 recent activity in its domain -> forms a quest
+                       for that alter to act (auto lane).
+      3. AGENT IDEA  — propose_initiatives() draws real repos to suggest builds.
+      4. MANUAL      — you (or the agent via + Agent Propose) add one explicitly.
+
+    Each alter's 'next want' is derived from real estate in its domain, not invented.
+    """
+    import subprocess
+    try:
+        wj = json.loads((HERE / "works.json").read_text(encoding="utf-8"))
+        projects = wj.get("projects", [])
+    except Exception:
+        projects = []
+    # recent activity agents
+    recent = set()
+    try:
+        acts = json.loads((HERE / "agent_activity.json").read_text(encoding="utf-8"))
+        for a in acts[:50]:
+            recent.add(a.get("agent"))
+    except Exception:
+        pass
+
+    # 1. stale repos -> formation candidates (with provenance)
+    formations = []
+    for p in projects:
+        repo = p.get("path", "")
+        pp = Path(repo)
+        why = None
+        if pp.exists() and (pp / ".git").exists():
+            try:
+                out = subprocess.run(["git", "-C", str(pp), "status", "--short"],
+                                     capture_output=True, text=True, timeout=10)
+                dirty = [l for l in out.stdout.splitlines() if l.strip()]
+                if dirty:
+                    why = f"{len(dirty)} uncommitted change(s) in {p['name']}"
+            except Exception:
+                pass
+        if why:
+            formations.append({"trigger": "stale_repo", "name": f"work on {p['name']}",
+                               "repo": repo, "why": why, "lane": "approval"})
+
+    # 2. peer gaps -> alter next-wants
+    alters = []
+    if FR is not None:
+        for a in FR.FLEET:
+            aid = a["id"]
+            owns = a.get("owns", "")
+            # an alter wants attention if it hasn't acted recently
+            if aid not in recent:
+                want = f"run a {a['role']} pass (no recent activity)"
+            else:
+                want = f"continue {owns} upkeep"
+            alters.append({"id": aid, "name": a["name"], "role": a.get("role", ""),
+                           "owns": owns, "active": aid in recent, "wants": want})
+    return {"ok": True, "formation_triggers": [
+                "stale_repo", "peer_gap", "agent_idea", "manual"
+            ], "pending_formations": formations[:8], "alters": alters}
+
+
 def toggle_quest(idx: int = None, name: str = None) -> dict:
     qs = load_quests()
     target = None
@@ -143,6 +208,7 @@ def approve_quest(name: str = None, idx: int = None) -> dict:
         "status": "queued",
         "note": f"dispatched on approval (repo: {q.get('repo') or 'n/a'})",
         "via": "quest-approval",
+        "repo": q.get("repo", ""),
     }
     append_inbox(entry)
     # fire local execution on a short delay (background) so the inbox write is
@@ -291,6 +357,8 @@ class H(BaseHTTPRequestHandler):
         u = self.path.rstrip("/")
         if u in ("/health",):
             self._json({"ok": True})
+        elif u in ("/quest/formation",):
+            self._json(formation_report())
         elif u in ("/quest",):
             self._json({"ok": True, "quests": load_quests()})
         elif u in ("/inbox",):
