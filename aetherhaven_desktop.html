@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Aetherhaven · Pocket Realm</title>
+<style>
+:root{
+  --rose:#ff9eb5; --violet:#c9a0ff; --cyan:#7afcff; --charcoal:#0e0a14;
+  --bone:#f3e9ef; --amber:#ffcf8f;
+  --bg:var(--charcoal);
+  --accent:var(--rose);
+  --panel:rgba(255,255,255,0.06);
+  --panel-rim:rgba(255,255,255,0.18);
+  --glow:rgba(201,160,255,0.30);
+  --text:var(--bone);
+  --muted:rgba(243,233,239,0.55);
+  --ui:1; /* density scale */
+}
+body[data-theme="rose"]{ --bg:#160a12; --accent:var(--rose); --panel-rim:rgba(255,158,181,0.30); }
+body[data-theme="violet"]{ --bg:#0c0a16; --accent:var(--violet); --panel-rim:rgba(201,160,255,0.32); }
+body[data-theme="cyan"]{ --bg:#06141a; --accent:var(--cyan); --panel-rim:rgba(122,252,255,0.32); }
+*[data-density="compact"]{ --ui:0.86; }
+*{box-sizing:border-box;font-size:calc(13px * var(--ui))}
+html,body{margin:0;height:100%;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+
+/* ===== LIQUID GLASS BACKDROP ===== */
+body::before{content:"";position:fixed;inset:-25%;z-index:0;pointer-events:none;filter:blur(70px) saturate(1.5);
+  background:
+   radial-gradient(40% 40% at 76% 16%, rgba(255,158,181,0.75), transparent 62%),
+   radial-gradient(46% 46% at 12% 84%, rgba(201,160,255,0.7), transparent 64%),
+   radial-gradient(40% 38% at 54% 50%, rgba(122,252,255,0.55), transparent 66%),
+   radial-gradient(34% 34% at 90% 80%, rgba(255,207,143,0.45), transparent 62%),
+   radial-gradient(30% 30% at 30% 20%, rgba(255,158,181,0.4), transparent 60%);
+  animation:drift 26s ease-in-out infinite alternate}
+@keyframes drift{0%{transform:translate3d(-3%,-2%,0) scale(1.08) rotate(0deg)}100%{transform:translate3d(3%,3%,0) scale(1.18) rotate(10deg)}}
+body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 120% at 50% 0%, rgba(255,255,255,0.06), transparent 50%),
+            linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.45));
+  backdrop-filter:blur(2px)}
+
+.monitor{position:fixed;inset:10px;z-index:1;border-radius:26px;
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 0 60px rgba(255,255,255,0.03);
+  background:linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  backdrop-filter:blur(24px) saturate(1.2);
+  display:flex;flex-direction:column;overflow:hidden}
+.menubar{display:flex;align-items:center;gap:8px;padding:8px 14px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+  border-bottom:1px solid rgba(255,255,255,0.10);font-size:calc(12px*var(--ui))}
+.menubar .dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.menubar .title{font-weight:600;color:var(--text);letter-spacing:.5px;text-shadow:0 1px 8px rgba(255,255,255,0.2)}
+.menubar .spacer{flex:1}
+.mbtn{position:relative;cursor:pointer;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:var(--text);
+  border-radius:12px;padding:4px 11px;font-size:calc(11px*var(--ui));backdrop-filter:blur(10px)}
+.mbtn:hover{background:rgba(255,255,255,0.16)}
+.pop{position:absolute;top:34px;right:0;background:rgba(20,16,30,0.55);border:1px solid rgba(255,255,255,0.2);border-radius:16px;
+  padding:10px;min-width:170px;z-index:50;box-shadow:0 20px 50px rgba(0,0,0,.5);display:none;backdrop-filter:blur(30px) saturate(1.4)}
+.pop.show{display:block}
+.pop label{display:flex;align-items:center;gap:6px;padding:4px 3px;font-size:calc(11px*var(--ui));cursor:pointer}
+.pop .row{display:flex;gap:6px;margin-top:6px}
+
+.desktop{flex:1;position:relative;overflow:hidden;padding:8px}
+
+/* ===== LIQUID GLASS WINDOWS (floating bubbles) ===== */
+.win{position:absolute;min-width:200px;min-height:90px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:22px;
+  backdrop-filter:blur(26px) saturate(1.4);
+  box-shadow:0 12px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -10px 30px rgba(201,160,255,0.06);
+  display:flex;flex-direction:column;overflow:hidden;resize:both}
+.win::before{content:"";position:absolute;top:0;left:8%;right:8%;height:42%;border-radius:22px 22px 50% 50%;
+  background:radial-gradient(60% 100% at 50% 0%, rgba(255,255,255,0.28), transparent 72%);pointer-events:none}
+.win::after{content:"";position:absolute;inset:0;border-radius:22px;pointer-events:none;
+  background:linear-gradient(135deg, rgba(255,255,255,0.14), transparent 30%, transparent 70%, rgba(255,255,255,0.05));
+  mix-blend-mode:screen}
+.win .bar{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:move;position:relative;z-index:1;
+  background:linear-gradient(90deg, rgba(255,158,181,0.16), rgba(201,160,255,0.08));border-bottom:1px solid rgba(255,255,255,0.10);
+  font-size:calc(12px*var(--ui));font-weight:600;text-shadow:0 1px 6px rgba(0,0,0,0.3)}
+.win .bar .led{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.win .bar .x{margin-left:auto;cursor:pointer;opacity:.6}
+.win .bar .x:hover{opacity:1}
+.win .body{padding:11px;overflow:auto;font-size:calc(12px*var(--ui));line-height:1.45;flex:1;position:relative;z-index:1}
+.win.collapsed .body{display:none}
+.win.collapsed{box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,0.3);min-height:0}
+.win.collapsed .bar{padding:7px 11px}
+.win.collapsed{border-radius:14px}
+.win.active{box-shadow:0 12px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,0.4), 0 0 0 2px var(--accent), 0 0 30px var(--glow)}
+
+/* presence dot — the living heartbeat of the system */
+.pin.presence{font-size:14px;color:var(--cyan);position:relative}
+.pin.presence::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:0 0 0 0 var(--cyan);animation:breathe 3.2s ease-out infinite}
+@keyframes breathe{0%{box-shadow:0 0 0 0 rgba(122,252,255,.5)}70%{box-shadow:0 0 0 9px rgba(122,252,255,0)}100%{box-shadow:0 0 0 0 rgba(122,252,255,0)}}
+.pin.presence.alert{color:var(--amber)}
+.pin.presence.alert::after{animation:breatheAmber 1.6s ease-out infinite}
+@keyframes breatheAmber{0%{box-shadow:0 0 0 0 rgba(255,200,120,.6)}70%{box-shadow:0 0 0 10px rgba(255,200,120,0)}100%{box-shadow:0 0 0 0 rgba(255,200,120,0)}}
+
+/* system-map node pulse on update */
+.smNode.flash{animation:smflash 1.1s ease-out}
+@keyframes smflash{0%{box-shadow:0 0 0 0 var(--glow)}60%{box-shadow:0 0 0 7px rgba(201,160,255,0)}100%{box-shadow:0 0 0 0 rgba(201,160,255,0)}}
+
+/* ===== CHROMEOS-FLEX SHELF + LAUNCHER ===== */
+.shelf{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;
+  max-width:90%;padding:7px 12px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));border:1px solid rgba(255,255,255,0.20);border-radius:22px;
+  backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 12px 34px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,0.35)}
+.launcher{width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,0.22);cursor:pointer;font-size:18px;
+  background:radial-gradient(circle at 32% 28%, rgba(255,255,255,0.9), var(--accent) 50%, var(--violet) 100%);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px var(--glow),inset 0 1px 4px rgba(255,255,255,.6);transition:transform .15s}
+.launcher:hover{transform:scale(1.08)}
+.shelfPins{display:flex;gap:7px;align-items:center}
+.shelfPins .pin{width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,0.16);cursor:pointer;font-size:18px;
+  display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);transition:transform .12s,background .12s}
+.shelfPins .pin:hover{transform:translateY(-3px);background:rgba(255,255,255,0.18)}
+.shelfPins .pin.active{background:linear-gradient(135deg,var(--accent),var(--violet));box-shadow:0 0 14px var(--glow)}
+.shelfRight{display:flex;align-items:center;gap:8px;margin-left:6px;padding-left:10px;border-left:1px solid rgba(255,255,255,0.14)}
+.shelfChat{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,0.18);cursor:pointer;font-size:17px;
+  background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
+.shelfChat:hover{background:rgba(255,255,255,0.18)}
+
+.launcherOverlay{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:6vh 0;backdrop-filter:blur(18px);background:radial-gradient(120% 120% at 50% 0%, rgba(20,16,30,0.55), rgba(10,8,16,0.82))}
+.launcherOverlay.show{display:flex;animation:pop .2s ease-out}
+.launcherTop{display:flex;gap:8px;align-items:center;width:min(720px,86%);padding:10px 14px;border-radius:18px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));border:1px solid rgba(255,255,255,0.22);
+  backdrop-filter:blur(30px);box-shadow:0 16px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,0.3)}
+.launcherTop input{flex:1;font-size:calc(14px*var(--ui));padding:9px 12px}
+.launcherTop .x{margin-left:4px;cursor:pointer;opacity:.7;font-size:18px}
+.launcherTop .x:hover{opacity:1}
+.appGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:14px;width:min(720px,86%);margin-top:18px;
+  max-height:64vh;overflow:auto;padding:4px}
+.appTile{border:1px solid rgba(255,255,255,0.18);border-radius:18px;padding:14px 10px;text-align:center;cursor:pointer;
+  background:linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04));backdrop-filter:blur(16px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 8px 22px rgba(0,0,0,.3);transition:transform .15s,box-shadow .15s}
+.appTile:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 14px 30px rgba(0,0,0,.4),0 0 22px var(--glow)}
+.appTile .ico{font-size:30px;margin-bottom:6px;filter:drop-shadow(0 2px 8px var(--glow))}
+.appTile .nm{font-size:calc(11px*var(--ui));font-weight:600;color:var(--text)}
+.appTile .sub{font-size:calc(9px*var(--ui));color:var(--muted);margin-top:2px}
+.launcherHint{margin-top:14px;font-size:calc(10px*var(--ui))}
+
+.bubble{position:absolute;right:22px;bottom:22px;width:68px;height:68px;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%, rgba(255,255,255,0.85), var(--accent) 45%, var(--violet) 100%);
+  display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;z-index:40;
+  box-shadow:0 14px 36px rgba(0,0,0,.5), inset 0 2px 8px rgba(255,255,255,0.6), inset 0 -8px 18px rgba(124,77,255,0.4);
+  animation:float 5s ease-in-out infinite;transition:transform .2s}
+.bubble:hover{transform:scale(1.06);filter:brightness(1.08)}
+.bubble::after{content:"";position:absolute;top:14%;left:22%;width:34%;height:26%;border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);filter:blur(2px)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+.bubblePanel{position:absolute;right:22px;bottom:100px;width:380px;height:62vh;max-height:70vh;
+  background:linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
+  border:1px solid rgba(255,255,255,0.22);border-radius:26px;display:none;flex-direction:column;z-index:41;
+  box-shadow:0 24px 70px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -12px 40px rgba(201,160,255,0.08);
+  backdrop-filter:blur(34px) saturate(1.5);overflow:hidden}
+.bubblePanel.show{display:flex;animation:pop .22s cubic-bezier(.2,.9,.3,1.2)}
+.bubblePanel::after{content:"";position:absolute;inset:0;border-radius:26px;pointer-events:none;
+  background:linear-gradient(135deg, rgba(255,255,255,0.16), transparent 28%, transparent 72%, rgba(255,255,255,0.06));
+  mix-blend-mode:screen}
+@keyframes pop{from{opacity:0;transform:translateY(16px) scale(.94)}to{opacity:1;transform:none}}
+.bpBar{display:flex;align-items:center;gap:8px;padding:11px 14px;position:relative;z-index:1;
+  background:linear-gradient(90deg, rgba(255,158,181,0.18), rgba(201,160,255,0.10));border-bottom:1px solid rgba(255,255,255,0.12);font-size:calc(12px*var(--ui))}
+.bpBar .x{margin-left:6px;cursor:pointer;opacity:.6}.bpBar .x:hover{opacity:1}
+.bpLog{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:9px;position:relative;z-index:1}
+.bpMsg{border-radius:16px 16px 16px 4px;padding:9px 13px;font-size:calc(12px*var(--ui));max-width:86%;line-height:1.4;
+  box-shadow:0 6px 18px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,0.25);backdrop-filter:blur(8px)}
+.bpMsg.you{align-self:flex-end;border-radius:16px 16px 4px 16px;
+  background:linear-gradient(135deg, var(--accent), var(--violet));color:#0e0a14;font-weight:500}
+.bpMsg.fleet{align-self:flex-start;background:linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));border:1px solid rgba(255,255,255,0.18)}
+.bpMsg.fleet .tag{color:var(--cyan);font-size:calc(10px*var(--ui));font-weight:700;text-shadow:0 0 8px var(--cyan)}
+.bpRow{display:flex;gap:6px;padding:10px;border-top:1px solid rgba(255,255,255,0.12);position:relative;z-index:1;
+  background:linear-gradient(0deg, rgba(255,255,255,0.06), transparent)}
+.bpRow select{flex:0 0 96px}.bpRow input{flex:1}
+
+/* cards / badges stay readable on glass */
+.badge{display:inline-block;font-size:calc(10px*var(--ui));padding:2px 9px;border-radius:20px;border:1px solid rgba(255,255,255,0.22);color:var(--muted);backdrop-filter:blur(8px)}
+.badge.ok{color:var(--cyan);border-color:rgba(122,252,255,.5)}
+.badge.warn{color:var(--amber);border-color:rgba(255,207,143,.5)}
+.badge.bad{color:var(--amber)}
+.card{border:1px solid rgba(255,255,255,0.16);border-radius:14px;padding:9px;margin-bottom:9px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2)}
+.card .h{display:flex;justify-content:space-between;color:var(--accent);font-weight:600;font-size:calc(11px*var(--ui))}
+.card .m{color:var(--muted);font-size:calc(10px*var(--ui));margin:3px 0}
+.muted{color:var(--muted)}
+.txt{font-size:calc(11px*var(--ui));line-height:1.45}
+summary{cursor:pointer;color:var(--muted);font-size:calc(11px*var(--ui))}
+input,select,textarea{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,0.20);color:var(--text);border-radius:10px;padding:6px 9px;font-size:calc(11px*var(--ui));font-family:inherit;backdrop-filter:blur(10px)}
+button.act{background:linear-gradient(135deg,var(--accent),var(--violet));color:#0e0a14;border:none;border-radius:10px;padding:6px 12px;font-size:calc(11px*var(--ui));cursor:pointer;font-weight:700;box-shadow:0 4px 14px var(--glow)}
+button.act:hover{filter:brightness(1.1)}
+.offline{color:var(--amber)}
+.picker{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:calc(11px*var(--ui))}
+.picker input[type=color]{width:36px;height:26px;border:none;background:none;cursor:pointer;border-radius:8px}
+.feed{font-family:monospace;font-size:calc(10px*var(--ui));color:var(--muted);max-height:120px;overflow:auto;border-top:1px solid rgba(255,255,255,.08);margin-top:6px;padding-top:4px}
+
+/* ===== TINDER CURATE CARDS ===== */
+.curWrap{display:flex;flex-direction:column;gap:8px}
+.tcard{border:1px solid rgba(255,255,255,0.18);border-radius:16px;padding:10px;position:relative;overflow:hidden;
+  background:linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 20px rgba(0,0,0,.3);transition:transform .18s, opacity .18s}
+.tcard.bye{transform:translateX(-40px) rotate(-4deg);opacity:0}
+.tcard.love{transform:translateX(40px) rotate(4deg);opacity:0}
+.tcard .th{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.tcard .realm{color:var(--accent);font-weight:700;font-size:calc(11px*var(--ui))}
+.tcard .badge{font-size:calc(9px*var(--ui))}
+.tcard .sum{font-size:calc(11.5px*var(--ui));line-height:1.45;margin:5px 0;color:var(--text)}
+.tcard .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.tcard .acts button{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,0.2);cursor:pointer;
+  font-size:15px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);transition:transform .12s}
+.tcard .acts button:hover{transform:scale(1.12)}
+.tcard .no{background:rgba(255,80,80,0.18);color:#ff9a9a}
+.tcard .yes{background:rgba(122,252,255,0.20);color:var(--cyan)}
+.tcard.kept{border-color:rgba(122,252,255,0.5)}
+.tcard.kept::after{content:"♥ kept";position:absolute;top:8px;right:10px;color:var(--cyan);font-size:calc(9px*var(--ui));opacity:.8}
+.curateEmpty{color:var(--muted);font-size:calc(11px*var(--ui));text-align:center;padding:14px 6px}
+
+/* ===== WEATHER CHANNEL ===== */
+.wxNow{display:flex;align-items:center;gap:12px;padding:4px 2px 10px}
+.wxIco{font-size:46px;filter:drop-shadow(0 2px 10px var(--glow))}
+.wxTemp{font-size:34px;font-weight:700;line-height:1}
+.wxUnit{font-size:15px;font-weight:400;color:var(--muted);margin-left:2px}
+.wxCond{font-size:calc(12px*var(--ui));color:var(--accent);font-weight:600}
+.wxMeta{font-size:calc(10px*var(--ui));color:var(--muted);margin-top:2px}
+.wxDays{display:flex;gap:6px;justify-content:space-between}
+.wxDay{flex:1;text-align:center;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:7px 3px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));backdrop-filter:blur(10px)}
+.wxD{font-size:calc(9px*var(--ui));color:var(--muted)}
+.wxDi{font-size:20px;margin:2px 0}
+.wxT{font-size:calc(12px*var(--ui));font-weight:600}
+.wxLo{color:var(--muted);font-weight:400}
+.wxPop{font-size:calc(9px*var(--ui));color:var(--cyan)}
+
+/* ===== SYSTEM MAP (live blueprint) ===== */
+.sysmap{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:2px}
+.smNode{border:1px solid rgba(255,255,255,0.14);border-radius:11px;padding:7px 8px;
+  background:linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));backdrop-filter:blur(9px);
+  position:relative;overflow:hidden}
+.smNode.ok{border-color:rgba(122,252,255,0.35)}
+.smNode.warn{border-color:rgba(255,200,120,0.45)}
+.smNode.off{border-color:rgba(255,120,140,0.4);opacity:.6}
+.smTop{display:flex;align-items:center;gap:5px}
+.smDot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.smNode.warn .smDot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.smNode.off .smDot{background:#ff7088;box-shadow:0 0 8px #ff7088}
+.smLbl{font-size:calc(9px*var(--ui));font-weight:700;letter-spacing:.4px;color:var(--text)}
+.smSub{font-size:calc(8px*var(--ui));color:var(--muted);margin-top:1px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smDet{font-size:calc(8px*var(--ui));color:var(--accent);margin-top:3px}
+
+
+</style>
+</head>
+<body data-theme="aurora">
+<div class="monitor">
+  <div class="menubar">
+    <span class="dot" style="background:var(--rose)"></span>
+    <span class="dot" style="background:var(--violet)"></span>
+    <span class="dot" style="background:var(--cyan)"></span>
+    <span class="title">AETHERHAVEN · POCKET REALM</span>
+    <span class="spacer"></span>
+    <span id="clock" class="muted"></span>
+    <span class="spacer"></span>
+    <span class="mbtn" id="mTheme">Theme ▾</span>
+    <span class="mbtn" id="mWin">Windows ▾</span>
+    <span class="mbtn" id="mLayout">Layout ▾</span>
+    <span class="mbtn" id="mDensity">Density ▾</span>
+    <span class="mbtn" id="mCurate" onclick="resetCuration()">🔁 Curate</span>
+    <!-- Theme pop -->
+    <div class="pop" id="popTheme">
+      <label><input type="radio" name="th" value="aurora" onchange="applyPreset('aurora')"> Aurora (default)</label>
+      <label><input type="radio" name="th" value="rose" onchange="applyPreset('rose')"> Rose</label>
+      <label><input type="radio" name="th" value="violet" onchange="applyPreset('violet')"> Violet</label>
+      <label><input type="radio" name="th" value="cyan" onchange="applyPreset('cyan')"> Cyan</label>
+      <div style="border-top:1px solid rgba(255,255,255,.08);margin:6px 0"></div>
+      <label onclick="openSettings()">⚙ Edit / save custom…</label>
+    </div>
+    <!-- Windows pop -->
+    <div class="pop" id="popWin"></div>
+    <!-- Layout pop -->
+    <div class="pop" id="popLayout">
+      <div class="row"><button class="act" onclick="setCalm(true)">🌿 Calm (collapse all)</button></div>
+      <div class="row"><button class="act" onclick="setCalm(false)">▣ Expand all</button></div>
+      <div class="row"><button class="act" onclick="saveLayout()">Save layout</button></div>
+      <div class="row"><button class="act" onclick="resetLayout()">Reset layout</button></div>
+      <div class="row"><button class="act" onclick="resetAll()">Reset everything</button></div>
+    </div>
+    <!-- Density pop -->
+    <div class="pop" id="popDensity">
+      <label><input type="radio" name="dz" value="comfortable" onchange="setDensity('comfortable')"> Comfortable</label>
+      <label><input type="radio" name="dz" value="compact" onchange="setDensity('compact')"> Compact</label>
+    </div>
+  </div>
+  <div class="desktop" id="desktop">
+    <!-- BUBBLE DOCK: talk directly to the agent + command the fleet -->
+    <div class="bubble" id="bubble" title="Talk to your fleet · drag to move" >💬</div>
+    <div class="bubblePanel" id="bubblePanel">
+      <div class="bpBar">
+        <span style="color:var(--accent);font-weight:600">✦ Fleet Comms</span>
+        <span class="spacer" style="flex:1"></span>
+        <span style="font-size:10px;color:var(--muted)">talk to me · command the fleet</span>
+        <span class="x" onclick="closeBubble(event)">✕</span>
+      </div>
+      <div class="bpLog" id="bpLog"></div>
+      <div class="bpRow">
+        <select id="bpTarget">
+          <option value="auto">◎ auto-route</option>
+          <option value="hermes">Hermes (runtime)</option>
+          <option value="steward">Steward (truth)</option>
+          <option value="aetherdeck">AetherDeck (command)</option>
+          <option value="aetherquest">AetherQuest (life)</option>
+          <option value="fairyos">FairyOS (shell)</option>
+          <option value="echovoice">Echo Voice</option>
+          <option value="brain">Knowledge Brain</option>
+          <option value="companion">Companion</option>
+        </select>
+        <input id="bpInput" placeholder="message the fleet…" onkeydown="if(event.key==='Enter')bpSend()"/>
+        <button class="act" onclick="bpSend()">Send</button>
+      </div>
+    </div>
+    <!-- CHROMEOS-FLEX SHELF + LAUNCHER -->
+    <div class="shelf" id="shelf">
+      <button class="launcher" id="launcherBtn" onclick="toggleLauncher()" title="Open launcher (search + apps)">🔘</button>
+      <div class="shelfPins" id="shelfPins"></div>
+      <div class="shelfRight">
+        <span id="clock" class="muted"></span>
+        <button class="shelfChat" id="shelfChat" onclick="openBubble()" title="Assistant">💬</button>
+      </div>
+    </div>
+    <!-- LAUNCHER OVERLAY -->
+    <div class="launcherOverlay" id="launcher">
+      <div class="launcherTop">
+        <input id="launcherSearch" placeholder="Search apps, realms, or ask the fleet…" oninput="launcherFilter()" onkeydown="if(event.key==='Enter')launcherGo()"/>
+        <button class="act" onclick="launcherGo()">Ask fleet →</button>
+        <span class="x" onclick="toggleLauncher()">✕</span>
+      </div>
+      <div class="appGrid" id="appGrid"></div>
+      <div class="launcherHint muted">Enter = route to fleet · click app = open window · drag windows to rearrange</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG / STATE ============
+const LS={layout:'ah_layout_v1',theme:'ah_theme_v1',themes:'ah_themes_v1',density:'ah_density_v1',win:'ah_wins_v1',calm:'ah_calm_v1'};
+const DEFAULT_WINS=[
+  {id:'deck',  title:'🛰 Command Deck', x:14,  y:14,  w:340, h:300},
+  {id:'credit',title:'💳 Credit Monitor',x:370, y:14,  w:280, h:180},
+  {id:'voice', title:'🔊 Echo Voice',   x:14,  y:330, w:300, h:170},
+  {id:'fleet', title:'🛡 Fleet',         x:370, y:210, w:300, h:160},
+  {id:'quest', title:'🌿 Today',        x:690, y:14,  w:280, h:220},
+  {id:'mother',title:'🧠 Raw Thoughts', x:690, y:250, w:300, h:200},
+  {id:'weather',title:'🌤 Weather',     x:1000,y:14,  w:280, h:300},
+  {id:'outbox',title:'📤 Outbox',      x:1000,y:330, w:280, h:220},
+  {id:'sysmap',title:'🛰 System Map',  x:1000,y:565, w:280, h:260},
+  {id:'settings',title:'⚙ Settings',    x:14,  y:520, w:320, h:260},
+];
+let winState=loadJSON(LS.win,{});   // {id:{x,y,w,h,hidden,collapsed}}
+let layout=loadJSON(LS.layout,null); // saved snapshot
+let curTheme=localStorage.getItem(LS.theme)||'aurora';
+let customThemes=loadJSON(LS.themes,[]);
+let density=localStorage.getItem(LS.density)||'comfortable';
+let feedLog=[];
+
+function loadJSON(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
+
+// ============ THEME ============
+function applyPreset(t){
+  curTheme=t; localStorage.setItem(LS.theme,t);
+  document.body.removeAttribute('data-theme'); if(t!=='aurora')document.body.dataset.theme=t;
+  document.body.style.cssText=''; // clear custom inline vars
+  syncThemeRadios();
+}
+function applyCustom(vars){
+  curTheme='custom'; localStorage.setItem(LS.theme,'custom');
+  document.body.removeAttribute('data-theme');
+  for(const[k,v] of Object.entries(vars)) document.body.style.setProperty(k,v);
+  syncThemeRadios();
+}
+function syncThemeRadios(){
+  document.querySelectorAll('input[name=th]').forEach(r=>r.checked=(r.value===curTheme));
+}
+// ============ DENSITY ============
+function setDensity(d){density=d;if(d==='compact')document.body.setAttribute('data-density','compact');else document.body.removeAttribute('data-density');localStorage.setItem(LS.density,d);
+  document.querySelectorAll('input[name=dz]').forEach(r=>r.checked=(r.value===d));}
+// ============ WINDOWS ============
+const desktop=document.getElementById('desktop');
+function buildWins(){
+  DEFAULT_WINS.forEach(w=>{
+    const st=winState[w.id]||{};
+    const el=document.createElement('div'); el.className='win'; el.id='win_'+w.id;
+    el.style.left=(st.x??w.x)+'px'; el.style.top=(st.y??w.y)+'px';
+    el.style.width=(st.w??w.w)+'px'; el.style.height=(st.h??w.h)+'px';
+    const hidden=st.hidden, collapsed=st.collapsed;
+    if(hidden) el.style.display='none'; if(collapsed) el.classList.add('collapsed');
+    el.innerHTML=`<div class="bar" ondblclick="toggleWin('${w.id}')">
+        <span class="led"></span><span>${w.title}</span>
+        <span class="x" onclick="event.stopPropagation();closeWin('${w.id}')">✕</span></div>
+      <div class="body" id="body_${w.id}">loading…</div>`;
+    desktop.appendChild(el);
+    makeDraggable(el,el.querySelector('.bar'));
+    el.addEventListener('mousedown',()=>activate(w.id));
+    w._el=el;
+    if(w.id==='settings') setBody('settings',settingsBody());
+    if(w.id==='voice') setBody('voice','<div class="txt">Local Qwen3-TTS. Owner-gated consent (SHA-256 ref-audio). Start Echo Voice to enable — <b>no cloud fallback</b> by design.</div>');
+    if(w.id==='fleet') setBody('fleet','<div class="txt">8 peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>');
+    if(w.id==='quest') setBody('quest','<div class="txt">• Wire Fairy OS weather-adaptive theme<br>• Add SLA timer to service-desk core<br>• Benchmark Qwen3-TTS on Windows CPU<br>• Consolidate fleet cron health report</div>');
+  });
+  buildShelf();
+  buildLauncher();
+  buildWinMenu();
+}
+function activate(id){document.querySelectorAll('.win').forEach(w=>w.classList.remove('active'));document.getElementById('win_'+id)?.classList.add('active');}
+function closeWin(id){const el=document.getElementById('win_'+id); if(el) el.style.display='none'; winState[id]=Object.assign(winState[id]||{},{hidden:true}); saveWin();}
+function toggleWin(id){const el=document.getElementById('win_'+id); if(el){el.classList.toggle('collapsed'); winState[id]=Object.assign(winState[id]||{},{collapsed:el.classList.contains('collapsed')}); saveWin();}}
+function showWin(id){const el=document.getElementById('win_'+id); if(el){el.style.display='flex'; if(el.classList.contains('collapsed'))toggleWin(id); winState[id]=Object.assign(winState[id]||{},{hidden:false}); saveWin();}}
+function saveWin(){for(const w of DEFAULT_WINS){const el=document.getElementById('win_'+w.id); if(el) winState[w.id]=Object.assign(winState[w.id]||{},{x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight,hidden:el.style.display==='none',collapsed:el.classList.contains('collapsed')});} localStorage.setItem(LS.win,JSON.stringify(winState));}
+// single shared drag controller — robust against re-binding
+let _drag=null; // {el, alsoMove, ox, oy}
+function makeDraggable(el,handle,alsoMove){
+  handle.onmousedown=(e)=>{
+    const r=el.getBoundingClientRect?el.getBoundingClientRect():{left:el.offsetLeft,top:el.offsetTop};
+    _drag={el,alsoMove,ox:e.clientX-(parseInt(el.style.left)||el.offsetLeft),oy:e.clientY-(parseInt(el.style.top)||el.offsetTop)};
+    e.preventDefault();
+  };
+}
+document.onmousemove=(e)=>{
+  if(!_drag)return;
+  const x=Math.max(0,e.clientX-_drag.ox), y=Math.max(0,e.clientY-_drag.oy);
+  _drag.el.style.left=x+'px'; _drag.el.style.top=y+'px';
+  if(_drag.alsoMove){_drag.alsoMove.style.left=x+'px'; _drag.alsoMove.style.top=(y+_drag.el.offsetHeight+10)+'px';}
+};
+document.onmouseup=()=>{ if(_drag){_drag=null; saveWin(); } };
+function buildShelf(){
+  // One primary nav: launcher (🔘) is the single "where do I go" surface.
+  // Shelf carries only: launcher (in HTML), chat, and a living presence dot.
+  const pins=document.getElementById('shelfPins'); pins.innerHTML='';
+  const chat=document.createElement('button'); chat.className='pin'; chat.textContent='💬';
+  chat.title='Open Fleet Comms'; chat.onclick=()=>openBubble(); pins.appendChild(chat);
+  const pres=document.createElement('button'); pres.className='pin presence'; pres.id='presenceDot';
+  pres.title='System presence — click for System Map'; pres.textContent='◉';
+  pres.onclick=()=>{showWin('sysmap');activate('sysmap');}; pins.appendChild(pres);
+}
+function markPin(id){}
+function buildLauncher(){
+  const grid=document.getElementById('appGrid'); grid.innerHTML='';
+  const apps=[
+    ...DEFAULT_WINS.map(w=>({ico:(w.title.match(/[🀀-🿿⚀-⚿\u{1F300}-\u{1FAFF}]/u)||['●'])[0],nm:w.title.replace(/^[^\w]+/,''),sub:'realm',go:()=>{showWin(w.id);activate(w.id);markPin(w.id);toggleLauncher();}})),
+    {ico:'💬',nm:'Assistant',sub:'talk to fleet',go:()=>{toggleLauncher();openBubble();}},
+    {ico:'🎨',nm:'Themes',sub:'customize',go:()=>{toggleLauncher();openSettings();}},
+    {ico:'🔁',nm:'Curate',sub:'reset cards',go:()=>{toggleLauncher();resetCuration();}},
+  ];
+  grid.dataset.apps=JSON.stringify(apps);
+  apps.forEach(a=>{const t=document.createElement('div');t.className='appTile';t.dataset.q=(a.nm+' '+a.sub).toLowerCase();
+    t.innerHTML=`<div class="ico">${a.ico}</div><div class="nm">${a.nm}</div><div class="sub">${a.sub}</div>`;t.onclick=a.go;grid.appendChild(t);});
+}
+function toggleLauncher(){const l=document.getElementById('launcher');l.classList.toggle('show');if(l.classList.contains('show'))setTimeout(()=>document.getElementById('launcherSearch').focus(),50);}
+function launcherFilter(){
+  const q=document.getElementById('launcherSearch').value.toLowerCase().trim();
+  document.querySelectorAll('#appGrid .appTile').forEach(t=>{t.style.display=(!q||t.dataset.q.includes(q))?'':'none';});
+}
+function launcherGo(){
+  const txt=document.getElementById('launcherSearch').value.trim();if(!txt)return;
+  toggleLauncher();
+  if(!bpLogEl.dataset.seeded){openBubble();bpLogEl.dataset.seeded='1';}
+  document.getElementById('bpInput').value=txt;bpSend();
+}
+function buildWinMenu(){
+  const p=document.getElementById('popWin');
+  p.innerHTML='';
+  DEFAULT_WINS.forEach(w=>{
+    const hidden=(winState[w.id]||{}).hidden;
+    const lab=document.createElement('label');
+    lab.innerHTML=`<input type="checkbox" ${hidden?'':'checked'} onchange="if(this.checked)showWin('${w.id}');else closeWin('${w.id}')"> ${w.title}`;
+    p.appendChild(lab);
+  });
+}
+// ============ LAYOUT PERSIST ============
+function saveLayout(){saveWin(); layout=JSON.parse(localStorage.getItem(LS.win)); localStorage.setItem(LS.layout,JSON.stringify(layout)); toast('Layout saved');}
+function resetLayout(){localStorage.removeItem(LS.layout); localStorage.removeItem(LS.win); winState={}; location.reload();}
+function resetAll(){Object.values(LS).forEach(k=>localStorage.removeItem(k)); location.reload();}
+function toast(m){const o=document.getElementById('bpLog'); if(o){const t=document.createElement('div');t.className='bpMsg fleet';t.innerHTML='<div class="tag">✦</div><div>'+esc(m)+'</div>';o.appendChild(t);o.scrollTop=o.scrollHeight;} else { console.log('[toast]',m); }}
+// ============ SUMMARIZE + CURATE ============
+function summarize(t,max){max=max||110;t=(t||'').replace(/\s+/g,' ').trim();if(t.length<=max)return t;
+  // cut at last sentence boundary within budget
+  let s=t.slice(0,max);const cut=s.lastIndexOf('.');if(cut>max*0.5)s=s.slice(0,cut+1);return s+' …';}
+let curation=loadJSON('ah_curate_v1',{dismissed:[],kept:[]});
+function resetCuration(){curation={dismissed:[],kept:[]};localStorage.setItem('ah_curate_v1',JSON.stringify(curation));loadAll();toast('Curate reset — showing all cards');}
+function curateState(id){if(curation.kept.includes(id))return 'kept';if(curation.dismissed.includes(id))return 'dismissed';return 'new';}
+function tinderCard(id,realm,badge,summary){
+  const st=curateState(id);
+  if(st==='dismissed')return '';
+  const kept=st==='kept';
+  return `<div class="tcard ${kept?'kept':''}">
+    <div class="th"><span class="realm">${esc(realm)}</span>${badge?('<span class="badge">'+badge+'</span>'):''}</div>
+    <div class="sum">${esc(summary)}</div>
+    <div class="acts">
+      <button class="no" title="not related" onclick="curateCard('${esc(id)}','no',this)">✕</button>
+      <button class="yes" title="keep" onclick="curateCard('${esc(id)}','yes',this)">♥</button>
+    </div></div>`;
+}
+function curateCard(id,act,btn){
+  const card=btn.closest('.tcard');
+  if(act==='no'){if(!curation.dismissed.includes(id))curation.dismissed.push(id);card.classList.add('bye');}
+  else{if(!curation.kept.includes(id))curation.kept.push(id);card.classList.add('love');}
+  localStorage.setItem('ah_curate_v1',JSON.stringify(curation));
+  setTimeout(()=>{loadAll();},200);
+}
+// ============ LIVE DATA ============
+async function loadAll(){
+  try{const s=await fetch('./state.json',{cache:'no-store'});
+    if(s.ok){const d=await s.json();const sla=d.sla||{};
+      const slatxt=sla.status==='met'?'SLA met':(sla.status==='warn'?'SLA at risk':'SLA breach');
+      setBody('deck',`<div class="card"><div class="h"><span>AetherOS truth</span><span class="badge ${sla.status==='met'?'ok':(sla.status==='warn'?'warn':'bad')}">${slatxt}</span></div>
+        <div class="m">${sla.pct||'?'}% · ${d.realms?d.realms.length:6} realms · voice ${(d.services&&d.services.echo_voice&&d.services.echo_voice.online)?'on':'off'}</div>
+        <div class="txt">${d.generated_at?('@ '+String(d.generated_at).replace('T',' ').slice(0,19)+' UTC'):''}</div></div><div id="deckCards"></div>`);}
+  }catch(e){setBody('deck','<span class="offline">state offline — start supervisor</span>');}
+  try{const c=await fetch('./credit_status.json',{cache:'no-store'});
+    if(c.ok){const d=await c.json();let h=d.cloud_routable?'<div class="badge ok">☁ cloud routable</div>':'<div class="badge warn">⛔ no cloud credit</div>';
+      for(const[n,p] of Object.entries(d.providers||{})){const col=p.state==='credit'?'var(--cyan)':(p.state==='not_configured'?'var(--muted)':'var(--amber)');
+        h+=`<div class="card" style="margin:6px 0"><div class="h"><span style="color:${col}">●</span><b>${n}</b></div><div class="m">${p.state}</div><div class="txt">${p.detail||''}</div></div>`;}
+      setBody('credit',h);}
+  }catch(e){setBody('credit','<span class="offline">credit monitor offline</span>');}
+  try{const m=await fetch('http://127.0.0.1:8920/synthesis',{cache:'no-store'});
+    if(m.ok){const d=await m.json();const dc=document.getElementById('deckCards');
+      if(dc){dc.innerHTML='<div class="curWrap">';
+        (d.synthesis||[]).forEach(c=>{const col=c.needs_your_call?'var(--amber)':'var(--cyan)';
+          const id='deck_'+c.realm.replace(/\W/g,'_');
+          dc.innerHTML+=tinderCard(id,c.realm,c.needs_your_call?'YOUR CALL':'',summarize(c.last_signal,120));});
+        dc.innerHTML+='</div>';
+        if(!((d.synthesis||[]).length)) dc.innerHTML='<div class="curateEmpty">No steer signals right now.</div>';}}
+  }catch(e){}
+  try{const r=await fetch('http://127.0.0.1:8920/thoughts?limit=8',{cache:'no-store'});
+    if(r.ok){const d=await r.json();let h='<div class="curWrap">';let any=false;
+      for(const[rl,items] of Object.entries(d.realms||{})){
+        items.slice(0,3).forEach((it,ix)=>{any=true;const id='th_'+rl.replace(/\W/g,'_')+'_'+ix;
+          h+=tinderCard(id,rl,'',summarize(it.thought,120));});}
+      h+='</div>';
+      if(!any)h='<div class="curateEmpty">No raw thoughts captured yet.</div>';
+      setBody('mother',h);}
+  }catch(e){setBody('mother','<span class="offline">mothership offline (:8920)</span>');}
+  loadWeather();
+  loadOutbox();
+  loadMap();
+  setCalm(localStorage.getItem(LS.calm)!=='false');
+  updatePresence();
+}
+// ============ CALM MODE (the "if it feels busy, cut" rule) ============
+function setCalm(on){
+  localStorage.setItem(LS.calm, on?'true':'false');
+  document.body.classList.toggle('calm',on);
+  document.querySelectorAll('.win').forEach(el=>{
+    const id=el.id.replace('win_','');
+    if(id==='deck') return; // keep the truth card visible as the anchor
+    if(on){ el.classList.add('collapsed'); }
+    else { el.classList.remove('collapsed'); }
+    winState[id]=Object.assign(winState[id]||{},{collapsed:on,hidden:false});
+  });
+  saveWin();
+}
+async function updatePresence(){
+  try{
+    const o=await fetch('http://127.0.0.1:8912/outbox',{cache:'no-store'});
+    const d=await o.json(); const n=d.count||0;
+    const dot=document.getElementById('presenceDot');
+    if(dot){ dot.classList.toggle('alert', n>0);
+      dot.textContent = n>0 ? `◉${n}` : '◉';
+      dot.title = n>0 ? `${n} awaiting your SEND` : 'All clear — system live'; }
+  }catch(e){}
+}
+// ============ WEATHER CHANNEL (local-first, Open-Meteo, no key) ============
+const WX_LAT=39.95, WX_LON=-75.17, WX_CITY='Philadelphia, PA';
+function wmo(code){
+  const m={0:['☀️','Clear'],1:['🌤️','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+    45:['🌫️','Fog'],48:['🌫️','Rime fog'],51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌧️','Dense drizzle'],
+    61:['🌦️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],66:['🌨️','Freezing rain'],67:['🌨️','Freezing rain'],
+    71:['🌨️','Light snow'],73:['🌨️','Snow'],75:['❄️','Heavy snow'],77:['🌨️','Snow grains'],
+    80:['🌦️','Rain showers'],81:['🌧️','Showers'],82:['⛈️','Violent showers'],85:['🌨️','Snow showers'],86:['🌨️','Snow showers'],
+    95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm + hail'],99:['⛈️','Thunderstorm + hail']};
+  return m[code]||['🌡️','—'];
+}
+async function loadWeather(){
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${WX_LAT}&longitude=${WX_LON}`+
+    `&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m`+
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`;
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const c=d.current, [ci,ct]=wmo(c.weather_code);
+    const f=(d.daily.weather_code||[]).map((wc,i)=>{const [fi,ft]=wmo(wc);
+      return {day:new Date(d.daily.time[i]).toLocaleDateString(undefined,{weekday:'short'}),
+        ico:fi, t:d.daily.temperature_2m_max[i], lo:d.daily.temperature_2m_min[i],
+        pop:d.daily.precipitation_probability_max[i]};});
+    let h=`<div class="wxNow"><span class="wxIco">${ci}</span><div><div class="wxTemp">${Math.round(c.temperature_2m)}°<span class="wxUnit">C</span></div>`+
+      `<div class="wxCond">${ct}</div><div class="wxMeta">${WX_CITY} · 💧${c.relative_humidity_2m}% · 💨${Math.round(c.wind_speed_10m)}km/h</div></div></div>`;
+    h+='<div class="wxDays">';
+    f.slice(0,4).forEach(dy=>{h+=`<div class="wxDay"><div class="wxD">${dy.day}</div><div class="wxDi">${dy.ico}</div>`+
+      `<div class="wxT">${Math.round(dy.t)}°<span class="wxLo">/${Math.round(dy.lo)}°</span></div>`+
+      `<div class="wxPop">${dy.pop??0}%</div></div>`;});
+    h+='</div>';
+    h+=`<div class="curateEmpty" style="margin-top:8px">local-first · Open-Meteo · no key</div>`;
+    setBody('weather',h);
+  }catch(e){setBody('weather','<span class="offline">weather offline — '+esc(e.message)+'</span>');}
+}
+// ============ OUTBOX (T2 external commands awaiting your SEND) ============
+async function loadOutbox(){
+  try{
+    const r=await fetch('http://127.0.0.1:8912/outbox',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(!d.commands.length){setBody('outbox','<div class="curateEmpty">Nothing awaiting send. External actions wait here for your approval.</div>');return;}
+    let h='<div class="curWrap">';
+    d.commands.forEach(c=>{const id=c.id;const st=c.status;
+      const done=st==='approved_send';
+      h+=`<div class="tcard ${done?'kept':''}"><div class="th"><span class="realm">→ ${esc(c.routed_to||'?')}</span>`+
+        `<span class="badge warn">${done?'SENT':'AWAIT'}</span></div>`+
+        `<div class="sum">${esc(c.text)}</div>`+
+        (done?'':`<div class="acts"><button class="yes" title="approve & send" onclick="outboxSend('${id}')">✔ SEND</button></div>`)+
+        `</div>`;});
+    h+='</div>';
+    setBody('outbox',h);
+  }catch(e){setBody('outbox','<span class="offline">dispatch offline (:8912)</span>');}
+}
+async function outboxSend(id){
+  try{
+    const r=await fetch('http://127.0.0.1:8912/send/'+id,{method:'POST'});
+    const d=await r.json();
+    bpAdd('fleet',`<div class="tag">→ outbox</div><div>${esc(d.note||'approved')}</div>`);
+    loadOutbox();
+  }catch(e){bpAdd('fleet',`<div class="tag">⚠</div><div>${esc(e.message)}</div>`);}
+}
+// ============ SYSTEM MAP (live blueprint telemetry) ============
+const MAP_NODES=[
+  ['orchestrator','CORE ORCHESTRATOR','central intelligence — understands, decides, orchestrates'],
+  ['inputs','INPUTS','user requests · files · connected sources'],
+  ['planning','PLANNING','break task · prioritize · route'],
+  ['execution','EXECUTION','run actions · draft · analyze · build'],
+  ['safety','SAFETY + VERIFY','permissions · check results · reduce errors'],
+  ['outputs','OUTPUTS','answer · document · app · plan'],
+  ['memory','MEMORY','session · notes · continuity'],
+  ['feedback','FEEDBACK LOOP','review · refine · continue'],
+  ['credit','CREDIT','cloud balance monitor'],
+];
+async function loadMap(){
+  try{
+    const r=await fetch('http://127.0.0.1:8913/map',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    let h='<div class="sysmap">';
+    MAP_NODES.forEach(([key,label,sub])=>{
+      const n=d.nodes[key]||{state:'off',detail:''};
+      h+=`<div class="smNode ${n.state}"><div class="smTop"><span class="smDot"></span><span class="smLbl">${label}</span></div>`+
+        `<div class="smSub">${sub}</div><div class="smDet">${esc(n.detail)}</div></div>`;
+    });
+    h+='</div>';
+    setBody('sysmap',h);
+    // gentle pulse so the map feels alive on each refresh
+    setTimeout(()=>{document.querySelectorAll('#body_sysmap .smNode').forEach(n=>{n.classList.add('flash');});},30);
+  }catch(e){setBody('sysmap','<span class="offline">system map offline (:8913)</span>');}
+}
+function setBody(id,html){const b=document.getElementById('body_'+id);if(b)b.innerHTML=html;}
+function settingsBody(){return `
+  <div class="txt" style="margin-bottom:6px">Live theme editor — changes apply instantly and persist.</div>
+  <div class="picker">Accent <input type="color" id="cAccent" value="#ff9eb5" oninput="liveVar('--accent',this.value)"></div>
+  <div class="picker">Background <input type="color" id="cBg" value="#0e0a14" oninput="liveVar('--bg',this.value)"></div>
+  <div class="picker">Panel rim <input type="color" id="cRim" value="#ff9eb5" oninput="liveVar('--panel-rim',this.value)"></div>
+  <div class="picker">Glow <input type="color" id="cGlow" value="#c9a0ff" oninput="liveVar('--glow',this.value)"></div>
+  <div class="picker">Text <input type="color" id="cText" value="#f3e9ef" oninput="liveVar('--text',this.value)"></div>
+  <div class="row" style="display:flex;gap:6px;margin-top:6px">
+    <input id="themeName" placeholder="name this theme" style="flex:1">
+    <button class="act" onclick="saveCustomTheme()">Save theme</button>
+  </div>
+  <div id="savedThemes" class="txt" style="margin-top:8px"></div>`;}
+function liveVar(k,v){document.body.removeAttribute('data-theme');document.body.style.setProperty(k,v);curTheme='custom';localStorage.setItem(LS.theme,'custom');}
+function saveCustomTheme(){
+  const name=(document.getElementById('themeName').value||'theme'+Date.now()).trim();
+  const vars={'--accent':document.getElementById('cAccent').value,'--bg':document.getElementById('cBg').value,
+    '--panel-rim':document.getElementById('cRim').value,'--glow':document.getElementById('cGlow').value,'--text':document.getElementById('cText').value};
+  customThemes=customThemes.filter(t=>t.name!==name);customThemes.push({name,vars});
+  localStorage.setItem(LS.themes,JSON.stringify(customThemes));applyCustom(vars);renderSavedThemes();toast('Saved "'+name+'"');
+}
+function renderSavedThemes(){
+  const c=document.getElementById('savedThemes');if(!c)return;
+  c.innerHTML='<b>Saved themes:</b><br>'+(customThemes.length?customThemes.map(t=>`<span style="cursor:pointer;color:var(--accent)" onclick="applyCustom(${JSON.stringify(t.vars).replace(/"/g,'&quot;')})">${t.name}</span> `).join(''):'<span class="muted">none yet</span>');
+}
+function openSettings(){showWin('settings');setTimeout(renderSavedThemes,50);}
+
+// ============ BUBBLE DOCK ============
+const bubbleEl=document.getElementById('bubble');
+const bubblePanelEl=document.getElementById('bubblePanel');
+const bpLogEl=document.getElementById('bpLog');
+// restore saved bubble position
+try{const bp=JSON.parse(localStorage.getItem('ah_bubble_v1')||'null');
+  if(bp){bubbleEl.style.left=bp.x+'px';bubbleEl.style.top=bp.y+'px';bubblePanelEl.style.left=bp.x+'px';bubblePanelEl.style.top=(parseInt(bp.y)+66)+'px';}}catch(e){}
+makeDraggable(bubbleEl,bubbleEl,bubblePanelEl);
+// also allow dragging via the panel header
+const bpBar=document.querySelector('.bpBar'); if(bpBar){bpBar.onmousedown=(e)=>{if(e.target.closest('.x'))return; makeDraggable(bubblePanelEl,bpBar,bubbleEl);};
+  document.addEventListener('mousemove',()=>{});}
+bubbleEl.onclick=(e)=>{ if(Math.abs(e.movementX)+Math.abs(e.movementY)<4) openBubble(); };
+function persistBubble(){try{localStorage.setItem('ah_bubble_v1',JSON.stringify({x:bubbleEl.offsetLeft,y:bubbleEl.offsetTop}));}catch(e){}}
+bubbleEl.addEventListener('mouseup',persistBubble);
+bubblePanelEl.addEventListener('mouseup',persistBubble);
+function openBubble(){
+  bubblePanelEl.classList.add('show');
+  if(!bpLogEl.dataset.seeded){
+    bpAdd('fleet','<div class="tag">✦ Aetherhaven</div><div>Welcome to your Pocket Realm chat. Talk to me directly, or pick an agent and command the fleet. External actions wait for your SEND.</div>');
+    bpLogEl.dataset.seeded='1';
+  }
+  document.getElementById('bpInput').focus();
+}
+function closeBubble(e){if(e)e.stopPropagation();bubblePanelEl.classList.remove('show');}
+function bpAdd(cls,html){const log=document.getElementById('bpLog');const m=document.createElement('div');m.className='bpMsg '+cls;m.innerHTML=html;log.appendChild(m);log.scrollTop=log.scrollHeight;}
+// open the chat room by default so it feels like the main surface
+setTimeout(openBubble,400);
+async function bpSend(){
+  const inp=document.getElementById('bpInput');const txt=inp.value.trim();if(!txt)return;
+  const target=document.getElementById('bpTarget').value;
+  bpAdd('you',esc(txt));
+  inp.value='';
+  try{
+    const r=await fetch('http://127.0.0.1:8911/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:txt,target})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const gate=d.sends?'<div class="gate">⚠ needs your SEND (external action gated)</div>':'<div class="gate" style="color:var(--cyan)">✓ queued · '+esc(d.status||'ok')+'</div>';
+    bpAdd('fleet',`<div class="tag">→ ${esc(d.routed_to||d.agent||'?')}</div><div>${esc(d.note||'routed')}</div>${gate}`);
+  }catch(err){
+    bpAdd('fleet',`<div class="tag">⚠ offline</div><div>${esc(err.message)} — is command_hub.py on :8911 running?</div>`);
+  }
+}
+
+// ============ POPS ============
+function togglePop(id){document.querySelectorAll('.pop').forEach(p=>{if(p.id!==id)p.classList.remove('show');});document.getElementById(id).classList.toggle('show');}
+document.getElementById('mTheme').onclick=()=>togglePop('popTheme');
+document.getElementById('mWin').onclick=()=>togglePop('popWin');
+document.getElementById('mLayout').onclick=()=>togglePop('popLayout');
+document.getElementById('mDensity').onclick=()=>togglePop('popDensity');
+document.addEventListener('click',e=>{if(!e.target.closest('.mbtn')&&!e.target.closest('.pop'))document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));});
+
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString();},1000);
+
+// ============ INIT ============
+applyPreset(curTheme==='custom'?'aurora':curTheme); if(curTheme==='custom'){const t=customThemes[customThemes.length-1];if(t)applyCustom(t.vars);}
+setDensity(density);
+renderStatic();
+
+buildWins();
+loadAll();setInterval(loadAll,12000);
+renderStatic();
+function renderStatic(){
+  setBody('voice','<div class="txt">Local Qwen3-TTS. Owner-gated consent (SHA-256 ref-audio). Start Echo Voice to enable — <b>no cloud fallback</b> by design.</div>');
+  setBody('fleet','<div class="txt">8 peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>');
+  setBody('quest','<div class="txt">• Wire Fairy OS weather-adaptive theme<br>• Add SLA timer to service-desk core<br>• Benchmark Qwen3-TTS on Windows CPU<br>• Consolidate fleet cron health report</div>');
+}
+</script>
+</body>
+</html>
