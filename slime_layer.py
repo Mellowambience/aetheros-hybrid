@@ -45,6 +45,16 @@ class SlimeLayer:
         for a in FLEET:
             self.register(a["id"])
 
+    def seed_from_fleet(self, hub="hermes"):
+        """Cold-start bootstrap. The real fleet is a star: `hermes` (Runtime) owns
+        tools/cron/gateway/memory and every other peer routes through it. Seed a lane
+        from each peer to the hub so a fresh layer can route immediately (peer->hub->peer).
+        Without this a fresh layer has 0 edges and cannot route."""
+        for p in FLEET:
+            if p["id"] != hub:
+                self.connect(p["id"], hub, weight=1.0)
+        return self
+
     # ---- topology helpers ----
     def _key(self, a, b):
         return f"{a}|{b}" if a < b else f"{b}|{a}"
@@ -79,19 +89,21 @@ class SlimeLayer:
     def _route(self, frm, to):
         if frm == to:
             return [frm]
-        visited = {frm}
-        path = [frm]
-        cur = frm
-        while cur != to:
-            nbrs = [(n, w) for n, w in self._neighbors(cur) if n not in visited]
-            if not nbrs:
-                return None
-            nbrs.sort(key=lambda x: -x[1])
-            nxt = nbrs[0][0]
-            path.append(nxt); visited.add(nxt); cur = nxt
-            if len(path) > 100:
-                return None
-        return path
+        # BFS for shortest path (greedy DFS gets stuck on star topologies like the
+        # real fleet, where hermes is the hub and every other peer is a leaf).
+        from collections import deque
+        q = deque([[frm]])
+        seen = {frm}
+        while q:
+            path = q.popleft()
+            cur = path[-1]
+            for n, w in self._neighbors(cur):
+                if n == to:
+                    return path + [n]
+                if n not in seen:
+                    seen.add(n)
+                    q.append(path + [n])
+        return None
 
     # ---- flow ----
     def emit(self, frm, to, payload, stype="signal"):
