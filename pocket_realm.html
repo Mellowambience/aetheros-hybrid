@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aetherhaven · Pocket Realm</title>
+<style>
+:root{
+  --bg:#0e0a14; --panel:rgba(22,16,30,0.55); --panel-2:rgba(34,24,46,0.62);
+  --rim:rgba(255,158,181,0.28); --accent:#ff9eb5; --violet:#c9a0ff; --cyan:#7afcff;
+  --text:#f3e9ef; --muted:#a99bb0; --amber:#ffc878; --glow:rgba(201,160,255,0.22);
+  --ok:#7afcff; --warn:#ffc878; --bad:#ff7088;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--text); background:var(--bg); overflow:hidden;
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, rgba(201,160,255,0.16), transparent 60%),
+    radial-gradient(800px 500px at 95% 110%, rgba(122,252,255,0.12), transparent 60%),
+    radial-gradient(600px 500px at 50% 50%, rgba(255,158,181,0.06), transparent 70%);
+}
+/* ===== TOP BAR ===== */
+.topbar{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;gap:14px;padding:0 16px;z-index:40;
+  background:linear-gradient(180deg, rgba(14,10,20,0.85), rgba(14,10,20,0.35));
+  backdrop-filter:blur(18px);border-bottom:1px solid var(--rim)}
+.logo{width:22px;height:22px;border-radius:7px;background:radial-gradient(circle at 30% 30%,var(--accent),var(--violet));box-shadow:0 0 14px var(--glow)}
+.brand{font-weight:700;letter-spacing:.5px;font-size:14px}
+.brand small{color:var(--muted);font-weight:400;letter-spacing:0;margin-left:6px;font-size:11px}
+.spacer{flex:1}
+.presence{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+  padding:5px 11px;border-radius:20px;background:var(--panel);border:1px solid var(--rim);cursor:pointer}
+.presence .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 0 var(--cyan);animation:breathe 3.2s infinite}
+.presence.alert .dot{background:var(--amber);animation:breatheA 1.6s infinite}
+.presence.alert{color:var(--amber);border-color:rgba(255,200,120,0.4)}
+@keyframes breathe{0%{box-shadow:0 0 0 0 rgba(122,252,255,.5)}70%{box-shadow:0 0 0 9px rgba(122,252,255,0)}100%{box-shadow:0 0 0 0 rgba(122,252,255,0)}}
+@keyframes breatheA{0%{box-shadow:0 0 0 0 rgba(255,200,120,.6)}70%{box-shadow:0 0 0 10px rgba(255,200,120,0)}100%{box-shadow:0 0 0 0 rgba(255,200,120,0)}}
+.tbBtn{font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--rim);border-radius:10px;padding:6px 11px;cursor:pointer}
+.tbBtn:hover{color:var(--text);border-color:var(--accent)}
+
+/* ===== 3-COLUMN GRID ===== */
+.grid{position:fixed;top:50px;left:0;right:0;bottom:0;display:grid;grid-template-columns:268px 1fr 300px;gap:12px;padding:12px}
+.col{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.col::-webkit-scrollbar{width:8px}
+.col::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
+
+/* ===== GLASS CARD ===== */
+.card{background:var(--panel);border:1px solid var(--rim);border-radius:16px;padding:13px 14px;
+  backdrop-filter:blur(22px) saturate(1.3);box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.18)}
+.card h3{margin:0 0 9px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:7px}
+.card h3 .ic{font-size:14px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.3px}
+.badge.ok{background:rgba(122,252,255,.16);color:var(--ok)}
+.badge.warn{background:rgba(255,200,120,.16);color:var(--warn)}
+.badge.bad{background:rgba(255,112,136,.18);color:var(--bad)}
+.muted{color:var(--muted);font-size:12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0}
+.peer{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px}
+.peer .pdot{width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 7px var(--violet)}
+.peer .role{color:var(--muted);font-size:10px;margin-left:auto}
+
+/* ===== CENTER: COMMAND COCKPIT ===== */
+.cockpit{display:flex;flex-direction:column;background:var(--panel-2);border:1px solid var(--rim);border-radius:18px;
+  backdrop-filter:blur(26px) saturate(1.4);box-shadow:0 14px 44px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.2);overflow:hidden}
+.cockpit .head{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--rim);font-weight:600;font-size:13px}
+.cockpit .head .led{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+.log{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:11px;min-height:0}
+.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:13px;line-height:1.45;animation:rise .25s ease}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg.sys{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);align-self:flex-start;border-bottom-left-radius:5px}
+.msg.user{background:linear-gradient(135deg,var(--accent),var(--violet));color:#160e1c;align-self:flex-end;font-weight:500;border-bottom-right-radius:5px}
+.msg.agent{background:rgba(201,160,255,.12);border:1px solid rgba(201,160,255,.28);align-self:flex-start;border-bottom-left-radius:5px}
+.msg .who{font-size:10px;font-weight:700;letter-spacing:.5px;opacity:.7;margin-bottom:3px}
+.composer{display:flex;gap:9px;padding:12px 14px;border-top:1px solid var(--rim);align-items:center}
+.composer select{background:var(--panel);color:var(--text);border:1px solid var(--rim);border-radius:10px;padding:8px;font-size:12px;max-width:130px}
+.composer input{flex:1;background:rgba(255,255,255,.07);border:1px solid var(--rim);border-radius:11px;color:var(--text);padding:11px 13px;font-size:13px;outline:none}
+.composer input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,158,181,.18)}
+.composer button{background:linear-gradient(135deg,var(--accent),var(--violet));color:#160e1c;border:none;border-radius:11px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 14px var(--glow)}
+.composer button:active{transform:translateY(1px)}
+.gate{font-size:11px;color:var(--amber);padding:0 14px 10px;display:flex;align-items:center;gap:6px}
+
+/* ===== RIGHT: CONTEXT ===== */
+.tile{font-size:12px}
+.wxNow{display:flex;align-items:center;gap:12px}
+.wxIco{font-size:40px;filter:drop-shadow(0 2px 10px var(--glow))}
+.wxTemp{font-size:30px;font-weight:700;line-height:1}
+.wxCond{color:var(--accent);font-weight:600;font-size:12px}
+.wxMeta{color:var(--muted);font-size:10px;margin-top:2px}
+.wxDays{display:flex;gap:5px;margin-top:10px}
+.wxDay{flex:1;text-align:center;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 2px;background:rgba(255,255,255,.04)}
+.wxD{font-size:9px;color:var(--muted)} .wxDi{font-size:17px;margin:2px 0} .wxT{font-size:11px;font-weight:600}
+.outItem{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.08);font-size:12px}
+.outItem:first-child{border-top:none}
+.outItem .send{margin-left:auto;background:rgba(255,200,120,.16);color:var(--amber);border:1px solid rgba(255,200,120,.3);border-radius:9px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700}
+.tag{font-size:9px;padding:1px 7px;border-radius:12px;background:rgba(255,200,120,.16);color:var(--amber);font-weight:700}
+.thought{font-size:11px;color:var(--muted);padding:6px 0;border-top:1px solid rgba(255,255,255,.07);line-height:1.4}
+.thought:first-child{border-top:none}
+.empty{color:var(--muted);font-size:11px;text-align:center;padding:14px 4px;font-style:italic}
+
+/* launcher overlay */
+.launcher{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(8,5,12,.55);backdrop-filter:blur(6px)}
+.launcher.show{display:flex}
+.lPanel{width:min(560px,92vw);background:var(--panel-2);border:1px solid var(--rim);border-radius:20px;padding:18px;backdrop-filter:blur(30px)}
+.lPanel input{width:100%;background:rgba(255,255,255,.07);border:1px solid var(--rim);border-radius:12px;color:var(--text);padding:13px 15px;font-size:15px;outline:none;margin-bottom:14px}
+.lPanel input:focus{border-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.app{display:flex;flex-direction:column;align-items:center;gap:5px;padding:13px 6px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);cursor:pointer;font-size:11px;transition:.15s}
+.app:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 10px 22px rgba(0,0,0,.4)}
+.app .ai{font-size:24px}
+.offline{color:var(--bad);font-size:11px;font-style:italic}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--rim);color:var(--text);padding:9px 16px;border-radius:12px;font-size:12px;z-index:80;backdrop-filter:blur(20px);opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"></div>
+  <div class="brand">AETHERHAVEN <small>Pocket Realm</small></div>
+  <div class="spacer"></div>
+  <div class="presence" id="presence" onclick="document.getElementById('outboxCard').scrollIntoView({behavior:'smooth'})">
+    <span class="dot"></span><span id="presenceTxt">system live</span>
+  </div>
+  <div class="tbBtn" onclick="toggleLauncher()">🔘 Launcher</div>
+  <div class="tbBtn" id="themeBtn">🎨 Theme</div>
+</div>
+
+<div class="grid">
+  <!-- LEFT: STATUS RAIL -->
+  <div class="col" id="leftRail">
+    <div class="card">
+      <h3><span class="ic">🛡</span> Fleet <span class="badge ok" id="fleetCount" style="margin-left:auto">–</span></h3>
+      <div id="fleetList"><div class="empty">loading…</div></div>
+    </div>
+    <div class="card">
+      <h3><span class="ic">🛰</span> System Map</h3>
+      <div id="sysMap"><div class="empty">loading…</div></div>
+    </div>
+    <div class="card">
+      <h3><span class="ic">💳</span> Credit</h3>
+      <div id="creditCard"><div class="empty">loading…</div></div>
+    </div>
+  </div>
+
+  <!-- CENTER: COMMAND COCKPIT -->
+  <div class="cockpit">
+    <div class="head"><span class="led"></span> Command Cockpit <span class="muted" style="font-weight:400;font-size:11px;margin-left:6px">— you & the fleet, one conversation</span></div>
+    <div class="log" id="log"></div>
+    <div class="gate">⚠ External actions wait for your SEND — nothing leaves without you.</div>
+    <div class="composer">
+      <select id="target">
+        <option value="auto">◎ auto-route</option>
+        <option value="hermes">Hermes</option><option value="steward">Steward</option>
+        <option value="aetherdeck">AetherDeck</option><option value="aetherquest">AetherQuest</option>
+        <option value="fairyos">FairyOS</option><option value="echovoice">Echo Voice</option>
+        <option value="brain">Knowledge Brain</option><option value="companion">Companion</option>
+      </select>
+      <input id="cmd" placeholder="message the fleet…" onkeydown="if(event.key==='Enter')sendCmd()">
+      <button onclick="sendCmd()">Send</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: CONTEXT RAIL -->
+  <div class="col" id="rightRail">
+    <div class="card">
+      <h3><span class="ic">🌤</span> Weather</h3>
+      <div id="weatherCard" class="tile"><div class="empty">loading…</div></div>
+    </div>
+    <div class="card" id="outboxCard">
+      <h3><span class="ic">📤</span> Outbox <span class="badge warn" id="outCount" style="margin-left:auto;display:none">0</span></h3>
+      <div id="outboxList"><div class="empty">nothing awaiting send</div></div>
+    </div>
+    <div class="card">
+      <h3><span class="ic">🧠</span> Raw Thoughts</h3>
+      <div id="thoughtsCard"><div class="empty">loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- LAUNCHER -->
+<div class="launcher" id="launcher">
+  <div class="lPanel">
+    <input id="lSearch" placeholder="Search apps or ask the fleet…" onkeydown="if(event.key==='Enter'){const t=this.value.trim();if(t){document.getElementById('cmd').value=t;toggleLauncher();sendCmd();}}">
+    <div class="grid2" id="appGrid"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const END={hub:'http://127.0.0.1:8911',dispatch:'http://127.0.0.1:8912',map:'http://127.0.0.1:8913',
+  mother:'http://127.0.0.1:8920',weather:'https://api.open-meteo.com/v1/forecast'};
+const APPS=[['🛰','Command Deck','deck'],['💳','Credit','credit'],['🔊','Echo Voice','voice'],
+  ['🛡','Fleet','fleet'],['🌿','Today','quest'],['🧠','Raw Thoughts','mother'],
+  ['🌤','Weather','weather'],['📤','Outbox','outbox'],['🛰','System Map','sysmap'],
+  ['⚙','Settings','settings'],['💬','Assistant','chat'],['🎨','Themes','theme']];
+const WMO={0:['☀️','Clear'],1:['🌤️','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+  45:['🌫️','Fog'],48:['🌫️','Rime fog'],51:['🌦️','Drizzle'],53:['🌦️','Drizzle'],55:['🌧️','Drizzle'],
+  61:['🌦️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],71:['🌨️','Snow'],73:['🌨️','Snow'],
+  75:['❄️','Snow'],80:['🌦️','Showers'],81:['🌧️','Showers'],82:['⛈️','Storms'],85:['🌨️','Snow sh'],
+  95:['⛈️','Thunder'],96:['⛈️','Thunder'],99:['⛈️','Thunder']};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id);
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200);}
+
+/* ---- chat ---- */
+function addMsg(role,who,text){
+  const d=document.createElement('div');d.className='msg '+(role||'sys');
+  if(who)d.innerHTML=`<div class="who">${esc(who)}</div>`+esc(text);else d.textContent=text;
+  $('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight;
+}
+async function sendCmd(){
+  const t=$('cmd').value.trim();if(!t)return;$('cmd').value='';
+  addMsg('user','you',t);
+  try{
+    const r=await fetch(END.hub+'/command',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:t,target:$('target').value})});
+    const d=await r.json();
+    const gate=d.sends?'⚠ queued — awaiting your SEND':'✓ routed';
+    addMsg('agent',d.routed_to||'fleet',`${d.note||''} ${gate}`);
+    if(d.sends)loadOutbox();
+  }catch(e){addMsg('sys','⚠',`command_hub unreachable — is :8911 up? (${e.message})`);}
+}
+
+/* ---- launcher ---- */
+function buildLauncher(){
+  const g=$('appGrid');g.innerHTML='';
+  APPS.forEach(([ic,nm,id])=>{const a=document.createElement('div');a.className='app';
+    a.innerHTML=`<div class="ai">${ic}</div><div>${nm}</div>`;
+    a.onclick=()=>{toggleLauncher();if(id==='chat'){$('cmd').focus();}else if(id==='theme'){$('themeBtn').click();}
+      else if(id==='deck'||id==='credit'||id==='voice'||id==='fleet'||id==='quest'||id==='mother'||id==='weather'||id==='outbox'||id==='sysmap'){toast(nm+' is on the rail →');}};
+    g.appendChild(a);});
+}
+function toggleLauncher(){$('launcher').classList.toggle('show');if($('launcher').classList.contains('show'))$('lSearch').focus();}
+
+/* ---- data loaders ---- */
+async function loadFleet(){
+  try{const r=await fetch(END.hub+'/fleet');const d=await r.json();const list=$('fleetList');
+    $('fleetCount').textContent=d.agents.length;
+    list.innerHTML=d.agents.map(a=>`<div class="peer"><span class="pdot"></span>${esc(a.name)}<span class="role">${esc(a.role)}</span></div>`).join('');
+  }catch(e){$('fleetList').innerHTML='<div class="offline">fleet offline</div>';}
+}
+async function loadMap(){
+  try{const r=await fetch(END.map+'/map');const d=await r.json();const m=$('sysMap');
+    m.innerHTML=Object.entries(d.nodes).map(([k,n])=>
+      `<div class="row"><span>${k}</span><span class="badge ${n.state==='ok'?'ok':n.state==='warn'?'warn':'bad'}">${n.state}</span></div>`+
+      (n.detail?`<div class="muted" style="font-size:10px;margin:-2px 0 4px">${esc(n.detail)}</div>`:'')).join('');
+  }catch(e){$('sysMap').innerHTML='<div class="offline">map offline</div>';}
+}
+async function loadCredit(){
+  try{const r=await fetch('./credit_status.json');const d=await r.json();const c=$('creditCard');
+    c.innerHTML=Object.entries(d.providers||{}).map(([n,p])=>
+      `<div class="row"><span>${esc(n)}</span><span class="badge ${p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'}">${esc(p.state)}</span></div>`).join('');
+  }catch(e){$('creditCard').innerHTML='<div class="empty">no credit monitor yet</div>';}
+}
+async function loadWeather(){
+  const url=`${END.weather}?latitude=39.95&longitude=-75.17&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`;
+  try{const d=await(await fetch(url)).json();const[ci,ct]=WMO[d.current.weather_code]||['🌡️','—'];const c=d.current;
+    let h=`<div class="wxNow"><span class="wxIco">${ci}</span><div><div class="wxTemp">${Math.round(c.temperature_2m)}°</div><div class="wxCond">${ct}</div><div class="wxMeta">Philadelphia · 💧${c.relative_humidity_2m}% · 💨${Math.round(c.wind_speed_10m)}km/h</div></div></div><div class="wxDays">`;
+    d.daily.time.slice(0,4).forEach((t,i)=>{const[fi]=WMO[d.daily.weather_code[i]]||['🌡️'];
+      h+=`<div class="wxDay"><div class="wxD">${new Date(t).toLocaleDateString(undefined,{weekday:'short'})}</div><div class="wxDi">${fi}</div><div class="wxT">${Math.round(d.daily.temperature_2m_max[i])}°</div></div>`;});
+    $('weatherCard').innerHTML=h+'</div>';
+    // ambient tint
+    const cool=[3,45,48,51,53,55,61,63,65,71,73,75,80,81,82,85,95,96,99],clear=[0,1];
+    const g=cool.includes(d.current.weather_code)?'rgba(122,252,255,0.18)':clear.includes(d.current.weather_code)?'rgba(255,200,120,0.18)':'rgba(201,160,255,0.2)';
+    document.documentElement.style.setProperty('--glow',g);
+  }catch(e){$('weatherCard').innerHTML='<div class="offline">weather offline</div>';}
+}
+async function loadOutbox(){
+  try{const d=await(await fetch(END.dispatch+'/outbox')).json();const o=$('outboxList');
+    $('outCount').style.display=d.count?'block':'none';$('outCount').textContent=d.count;
+    const p=$('presence');p.classList.toggle('alert',d.count>0);
+    $('presenceTxt').textContent=d.count?`${d.count} awaiting your SEND`:'system live';
+    if(!d.count){o.innerHTML='<div class="empty">nothing awaiting send</div>';return;}
+    o.innerHTML=d.commands.map(c=>`<div class="outItem"><span class="tag">AWAIT</span><span>${esc(c.text).slice(0,42)}</span><button class="send" onclick="sendOut('${c.id}')">SEND</button></div>`).join('');
+  }catch(e){}
+}
+async function sendOut(id){
+  try{const d=await(await fetch(END.dispatch+'/send/'+id,{method:'POST'})).json();
+    addMsg('sys','outbox',d.note||'approved');loadOutbox();}catch(e){toast('send failed');}
+}
+async function loadThoughts(){
+  try{const d=await(await fetch(END.mother+'/thoughts?limit=6')).json();const t=$('thoughtsCard');
+    let h='';for(const[rl,items] of Object.entries(d.realms||{})){items.slice(0,2).forEach(it=>{h+=`<div class="thought"><b style="color:var(--violet)">${esc(rl)}</b> · ${esc(it.thought).slice(0,90)}…</div>`;});}
+    t.innerHTML=h||'<div class="empty">no thoughts captured</div>';
+  }catch(e){$('thoughtsCard').innerHTML='<div class="offline">mothership offline</div>';}
+}
+
+/* ---- theme ---- */
+const THEMES={'Aurora':null,'Rose':['#ff9eb5','#ff9eb5','#0e0a14'],'Violet':['#c9a0ff','#c9a0ff','#0e0a14'],'Cyan':['#7afcff','#7afcff','#0e0a14']};
+$('themeBtn').onclick=()=>{const ks=Object.keys(THEMES);const cur=localStorage.getItem('pr_theme')||'Aurora';
+  const nx=ks[(ks.indexOf(cur)+1)%ks.length];localStorage.setItem('pr_theme',nx);applyTheme(nx);toast('theme: '+nx);};
+function applyTheme(n){const v=THEMES[n];if(v)document.documentElement.style.setProperty('--accent',v[0]);}
+
+/* ---- boot ---- */
+buildLauncher();
+addMsg('sys','Aetherhaven','Welcome to your Pocket Realm. Talk to me directly, or pick an agent and command the fleet. External actions wait for your SEND.');
+async function refresh(){await Promise.all([loadFleet(),loadMap(),loadCredit(),loadWeather(),loadOutbox(),loadThoughts()]);}
+refresh();setInterval(refresh,12000);
+applyTheme(localStorage.getItem('pr_theme')||'Aurora');
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('launcher').classList.remove('show');});
+</script>
+</body>
+</html>
