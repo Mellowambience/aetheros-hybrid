@@ -424,7 +424,7 @@ async function loadFleet(){
   }catch(e){}
 }
 function fleetBodyHTML(agents){
-  agents = agents.length ? agents : [];
+  agents = agents && agents.length ? agents : [];
   const n=agents.length;
   let h=`<div class="txt">${n} peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>`;
   h+=`<details class="wiz"><summary>＋ Add agent</summary>`+
