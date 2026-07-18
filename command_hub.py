@@ -21,7 +21,7 @@ Endpoints (loopback :8911):
 No cloud. No key. Local-first by construction.
 """
 from __future__ import annotations
-import json, os, time, uuid
+import json, os, time, uuid, threading
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -114,8 +114,9 @@ def toggle_quest(idx: int = None, name: str = None) -> dict:
 
 
 def approve_quest(name: str = None, idx: int = None) -> dict:
-    """Human sign-off for an `approval`-lane quest. Until approved it cannot be
-    auto-executed by the agent."""
+    """Human sign-off for an `approval`-lane quest. On approval the quest is
+    auto-dispatched: it becomes a real local command in the inbox and is executed
+    immediately via dispatch (T0/T1 local execution). This is the 'approve = run' gate."""
     qs = load_quests()
     target = None
     if name is not None:
@@ -129,7 +130,34 @@ def approve_quest(name: str = None, idx: int = None) -> dict:
         return {"ok": False, "error": "no such quest"}
     qs[target]["approved"] = True
     save_quests(qs)
-    return {"ok": True, "quests": qs}
+    # dispatch: turn the approved quest into a real local command and execute it
+    q = qs[target]
+    entry = {
+        "id": uuid.uuid4().hex[:8],
+        "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "text": f"[quest:approved] {q['name']}",
+        "target": "auto",
+        "routed_to": q.get("repo") and "hermes" or "hermes",
+        "agent_id": "hermes",
+        "sends": False,
+        "status": "queued",
+        "note": f"dispatched on approval (repo: {q.get('repo') or 'n/a'})",
+        "via": "quest-approval",
+    }
+    append_inbox(entry)
+    # fire local execution on a short delay (background) so the inbox write is
+    # guaranteed flushed before dispatch reads it. T0/T1 only; external stays gated.
+    def _dispatch_later():
+        try:
+            time.sleep(0.3)
+            import urllib.request
+            # data=b'' forces a POST (urlopen defaults to GET otherwise, and dispatch
+            # only handles /dispatch as POST -> a GET would 404).
+            urllib.request.urlopen("http://127.0.0.1:8912/dispatch", data=b"", timeout=5)
+        except Exception:
+            pass  # dispatch not up — command stays queued, runs on next tick
+    threading.Thread(target=_dispatch_later, daemon=True).start()
+    return {"ok": True, "quests": qs, "dispatched": entry["id"]}
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +401,6 @@ class H(BaseHTTPRequestHandler):
 
 
 def main():
-    import threading
     # drain slime_layer signals into the real command inbox every 3s
     def _drain_loop():
         while True:

@@ -312,7 +312,7 @@ async function toggleQuest(i){try{const qs=(await(await fetch(END.hub+'/quest'))
   if(d.ok)loadQuests();}catch(e){}}
 async function approveQuest(name){try{
   const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'approve',name:name})})).json();
-  if(d.ok){loadQuests();addMsg('sys','approved: '+name+' — agent can now run it');}else addMsg('sys','approve failed: '+(d.error||''));}catch(e){}}
+  if(d.ok){loadQuests();addMsg('sys','approved + dispatched: '+name+' — now running');}else addMsg('sys','approve failed: '+(d.error||''));}catch(e){}}
 async function proposeInitiatives(){try{
   const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'propose'})})).json();
   if(d.ok){loadQuests();addMsg('agent','proposed '+(d.made||[]).length+' initiative(s) from your repos');}else addMsg('sys','propose failed: '+(d.error||''));}catch(e){addMsg('sys','cannot reach quest API');}}
