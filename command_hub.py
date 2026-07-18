@@ -113,10 +113,34 @@ class H(BaseHTTPRequestHandler):
                 except Exception:
                     rows = []
             self._json({"count": len(rows), "commands": rows[:50]})
+        elif u in ("/fleet",):
+            if FR is None:
+                self._json({"ok": False, "agents": []})
+            else:
+                self._json({"ok": True, "agents": [{"id": a["id"], "name": a["name"], "role": a.get("role", "")}
+                                                    for a in FR.FLEET]})
         else:
             self.send_response(404); self.end_headers()
 
     def do_POST(self):
+        if self.path.rstrip("/") == "/add-agent":
+            try:
+                n = int(self.headers.get("Content-Length", 0))
+                raw = self.rfile.read(n) if n else b"{}"
+                peer = json.loads(raw or b"{}")
+                if FR is None or not hasattr(FR, "add_peer"):
+                    self._json({"ok": False, "error": "router unavailable"}, 503); return
+                res = FR.add_peer(peer)
+                # reload router module so in-memory FLEET reflects the new peer live
+                try:
+                    import importlib
+                    importlib.reload(FR)
+                except Exception:
+                    pass
+                self._json(res, 200 if res.get("ok") else 400)
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)}, 400)
+            return
         if self.path.rstrip("/") != "/command":
             self.send_response(404); self.end_headers(); return
         try:

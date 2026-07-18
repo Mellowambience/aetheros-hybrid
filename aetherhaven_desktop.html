@@ -245,7 +245,12 @@ button.act:hover{filter:brightness(1.1)}
 .smNode.off .smDot{background:#ff7088;box-shadow:0 0 8px #ff7088}
 .smLbl{font-size:calc(9px*var(--ui));font-weight:700;letter-spacing:.4px;color:var(--text)}
 .smSub{font-size:calc(8px*var(--ui));color:var(--muted);margin-top:1px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.smDet{font-size:calc(8px*var(--ui));color:var(--accent);margin-top:3px}
+/* add-agent wizard */
+.wiz{margin-top:8px;border-top:1px solid rgba(255,255,255,.14);padding-top:6px}
+.wiz summary{cursor:pointer;color:var(--accent);font-size:calc(11px*var(--ui));font-weight:600}
+.wizForm{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.wizIn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;color:var(--text);padding:5px 8px;font-size:calc(11px*var(--ui))}
+.wizMsg{font-size:calc(10px*var(--ui));min-height:12px}
 
 
 </style>
@@ -402,12 +407,54 @@ function buildWins(){
     w._el=el;
     if(w.id==='settings') setBody('settings',settingsBody());
     if(w.id==='voice') setBody('voice','<div class="txt">Local Qwen3-TTS. Owner-gated consent (SHA-256 ref-audio). Start Echo Voice to enable — <b>no cloud fallback</b> by design.</div>');
-    if(w.id==='fleet') setBody('fleet','<div class="txt">8 peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>');
+    if(w.id==='fleet') setBody('fleet', fleetBodyHTML());
     if(w.id==='quest') setBody('quest','<div class="txt">• Wire Fairy OS weather-adaptive theme<br>• Add SLA timer to service-desk core<br>• Benchmark Qwen3-TTS on Windows CPU<br>• Consolidate fleet cron health report</div>');
   });
   buildShelf();
   buildLauncher();
   buildWinMenu();
+}
+// ============ FLEET (live peers + add-agent wizard) ============
+async function loadFleet(){
+  try{
+    const r=await fetch('http://127.0.0.1:8911/fleet',{cache:'no-store'});
+    if(!r.ok) return;
+    const d=await r.json();
+    setBody('fleet', fleetBodyHTML(d.agents||[]));
+  }catch(e){}
+}
+function fleetBodyHTML(agents){
+  agents = agents.length ? agents : [];
+  const n=agents.length;
+  let h=`<div class="txt">${n} peer agents, federated. Hermes=runtime, Steward=observer; neither commands the others. All equal agency.</div>`;
+  h+=`<details class="wiz"><summary>＋ Add agent</summary>`+
+     `<div class="wizForm">`+
+     `<input id="agId" placeholder="id (e.g. analyst)" class="wizIn">`+
+     `<input id="agName" placeholder="name" class="wizIn">`+
+     `<input id="agRole" placeholder="role" class="wizIn">`+
+     `<input id="agKeys" placeholder="keywords (comma sep)" class="wizIn">`+
+     `<button class="act" onclick="addAgent()">Add peer</button>`+
+     `<div id="agMsg" class="wizMsg"></div></div></details>`;
+  return h;
+}
+async function addAgent(){
+  const id=document.getElementById('agId').value.trim();
+  const name=document.getElementById('agName').value.trim();
+  const role=document.getElementById('agRole').value.trim();
+  const keys=document.getElementById('agKeys').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const msg=document.getElementById('agMsg');
+  if(!id||!name){msg.textContent='id + name required';msg.style.color='var(--amber)';return;}
+  try{
+    const r=await fetch('http://127.0.0.1:8911/add-agent',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id,name,role,keywords:keys})});
+    const d=await r.json();
+    msg.textContent = d.ok ? `added ${id} ✓ (restart routing to activate)` : (d.error||'failed');
+    msg.style.color = d.ok ? 'var(--cyan)' : 'var(--amber)';
+    if(d.ok){ // refresh fleet list + reload router in hub
+      await fetch('http://127.0.0.1:8911/fleet',{cache:'no-store'});
+      loadFleet();
+    }
+  }catch(e){msg.textContent=e.message;msg.style.color='var(--amber)';}
 }
 function activate(id){document.querySelectorAll('.win').forEach(w=>w.classList.remove('active'));document.getElementById('win_'+id)?.classList.add('active');}
 function closeWin(id){const el=document.getElementById('win_'+id); if(el) el.style.display='none'; winState[id]=Object.assign(winState[id]||{},{hidden:true}); saveWin();}
@@ -541,6 +588,7 @@ async function loadAll(){
   loadWeather();
   loadOutbox();
   loadMap();
+  loadFleet();
   setCalm(localStorage.getItem(LS.calm)!=='false');
   updatePresence();
 }
@@ -600,7 +648,19 @@ async function loadWeather(){
     h+='</div>';
     h+=`<div class="curateEmpty" style="margin-top:8px">local-first · Open-Meteo · no key</div>`;
     setBody('weather',h);
+    weatherTint(c.weather_code);
   }catch(e){setBody('weather','<span class="offline">weather offline — '+esc(e.message)+'</span>');}
+}
+// weather-adaptive ambient tint (subtle, reversible by theme change)
+function weatherTint(code){
+  const cool=[3,45,48,51,53,55,61,63,65,71,73,75,77,80,81,82,85,86,95,96,99];
+  const clear=[0,1];
+  let glow, bg;
+  if(cool.includes(code)){ glow='rgba(122,252,255,0.22)'; bg='rgba(10,18,30,0.55)'; }      // rainy → cool blue
+  else if(clear.includes(code)){ glow='rgba(255,200,120,0.22)'; bg='rgba(30,16,14,0.50)'; } // clear → warm rose
+  else { glow='rgba(201,160,255,0.24)'; bg='rgba(20,14,26,0.55)'; }                          // mixed → violet
+  document.documentElement.style.setProperty('--glow',glow);
+  document.documentElement.style.setProperty('--bg',bg);
 }
 // ============ OUTBOX (T2 external commands awaiting your SEND) ============
 async function loadOutbox(){

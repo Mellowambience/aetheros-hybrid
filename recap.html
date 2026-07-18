@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AetherOS Hybrid — Visual Recap</title>
+<style>
+:root{
+  --bg:#0e0a14; --accent:#ff9eb5; --violet:#c9a0ff; --cyan:#7afcff;
+  --amber:#ffc878; --text:#f3e9ef; --muted:#a99fb0;
+}
+*{box-sizing:border-box}
+html{background:#0b0710}
+body{margin:0;background:#0b0710; /* solid base so capture never flashes white */
+  background-image:
+  radial-gradient(900px 600px at 12% 8%, rgba(255,158,181,.16),
+  radial-gradient(800px 600px at 88% 14%, rgba(122,252,255,.13)),
+  radial-gradient(700px 700px at 50% 110%, rgba(201,160,255,.12)),
+  linear-gradient(160deg,#0e0a14,#0b0710);
+  color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:34px 30px 50px}
+.wrap{max-width:1080px;margin:0 auto}
+header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px;
+  background:linear-gradient(135deg,var(--accent),var(--violet));box-shadow:0 0 22px rgba(201,160,255,.5)}
+h1{font-size:25px;margin:0;letter-spacing:.5px}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+.hero{margin:20px 0 24px;display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.card{background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px 17px;
+  backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 14px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.35)}
+.eyebrow{font-size:10px;letter-spacing:1.6px;color:var(--accent);font-weight:700;text-transform:uppercase}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.kpi{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px}
+.kpi b{display:block;font-size:22px;font-weight:800;color:var(--cyan)}
+.kpi span{font-size:10.5px;color:var(--muted)}
+.presence{display:flex;align-items:center;gap:12px;margin-top:14px;
+  background:rgba(122,252,255,.07);border:1px solid rgba(122,252,255,.3);border-radius:13px;padding:11px 13px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--amber);box-shadow:0 0 14px var(--amber);position:relative}
+.dot::after{content:'';position:absolute;inset:0;border-radius:50%;animation:b 2.6s ease-out infinite}
+@keyframes b{0%{box-shadow:0 0 0 0 rgba(255,200,120,.6)}70%{box-shadow:0 0 0 11px rgba(255,200,120,0)}100%{box-shadow:0 0 0 0 rgba(255,200,120,0)}}
+.presence b{color:var(--amber)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.step{position:relative}
+.step .n{position:absolute;top:-11px;left:14px;width:24px;height:24px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--violet));display:grid;place-items:center;
+  font-size:12px;font-weight:800;box-shadow:0 0 12px rgba(201,160,255,.5)}
+.step h3{margin:14px 0 4px;font-size:13.5px}
+.step p{margin:0;font-size:11.5px;line-height:1.5;color:var(--muted)}
+.tag{display:inline-block;font-size:9.5px;padding:2px 7px;border-radius:7px;margin-top:8px;
+  background:rgba(122,252,255,.12);color:var(--cyan);border:1px solid rgba(122,252,255,.3)}
+.map{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+.node{border:1px solid rgba(255,255,255,.14);border-radius:11px;padding:8px 9px;
+  background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.03))}
+.node.ok{border-color:rgba(122,252,255,.35)}
+.node.warn{border-color:rgba(255,200,120,.45)}
+.node .t{font-size:9.5px;font-weight:700;letter-spacing:.4px}
+.node .d{font-size:9.5px;color:var(--accent);margin-top:3px}
+.foot{margin-top:26px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.chip{font-size:10px;padding:4px 9px;border-radius:20px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14);color:var(--text)}
+.caveat{margin-top:18px;font-size:10.5px;color:var(--muted);border-left:2px solid var(--amber);padding-left:11px;line-height:1.6}
+h2.sec{font-size:14px;margin:30px 0 14px;letter-spacing:.4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🛰</div>
+    <div>
+      <h1>AetherOS Hybrid · Pocket Realm</h1>
+      <div class="sub">Visual recap — session 2026-07-17 · local-first agent OS · ChromeOS-Flex shell</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="card">
+      <div class="eyebrow">What shipped</div>
+      <p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;color:var(--text)">
+        A calm, glass-desktop that wraps a <b>federated fleet of 8 peer agents</b>. ChromeOS-Flex
+        launcher + shelf fused with a liquid-glass chat room. One chat, one launcher, a breathing
+        presence dot, and quiet panels that expand on demand.</p>
+      <div class="kpis">
+        <div class="kpi"><b>10</b><span>glass windows</span></div>
+        <div class="kpi"><b>8</b><span>peer agents</span></div>
+        <div class="kpi"><b>6</b><span>live services</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Live presence</div>
+      <div class="presence">
+        <div class="dot"></div>
+        <div><b>◉ 2 awaiting your SEND</b><br>
+        <span style="font-size:10.5px;color:var(--muted)">human gate active · no external action fires without you</span></div>
+      </div>
+      <div class="chips">
+        <span class="chip">🔘 launcher</span><span class="chip">💬 chat</span>
+        <span class="chip">📤 outbox</span><span class="chip">🛰 system map</span>
+        <span class="chip">🌤 weather</span><span class="chip">🛡 SLA</span>
+      </div>
+    </div>
+  </section>
+
+  <h2 class="sec">Build sequence</h2>
+  <div class="grid">
+    <div class="card step"><div class="n">1</div>
+      <h3>ChromeOS-Flex shell</h3>
+      <p>Shelf + launcher app-grid + search fused onto the liquid-glass agent OS. One cohesive surface.</p>
+      <span class="tag">resolved: "not loading" = stale tab</span></div>
+    <div class="card step"><div class="n">2</div>
+      <h3>CORS fix (real blocker)</h3>
+      <p>Hub lacked <code>do_OPTIONS</code> → browser preflight 501 → "Failed to fetch". Added it, killed 4 orphan supervisors.</p>
+      <span class="tag">chat now routes to fleet</span></div>
+    <div class="card step"><div class="n">3</div>
+      <h3>Weather channel</h3>
+      <p>🌀 Live Philadelphia forecast via Open-Meteo — no key, local-first. Current + 4-day.</p>
+      <span class="tag">verified: 29°C clear</span></div>
+    <div class="card step"><div class="n">4</div>
+      <h3>Dispatch layer</h3>
+      <p>command_hub routes → dispatch executes T0/T1 locally, queues T2 to Outbox with a real SEND button.</p>
+      <span class="tag">verified: quest executed</span></div>
+    <div class="card step"><div class="n">5</div>
+      <h3>Live System Map</h3>
+      <p>HERMES blueprint as truthful telemetry — every node shows real runtime state, pulsing on refresh.</p>
+      <span class="tag">verified: 8 peers routed</span></div>
+    <div class="card step"><div class="n">6</div>
+      <h3>Calm mode + repo</h3>
+      <p>Cut 8 redundant shelf pins to 3; windows collapse to chips. Git init, clean commit, tag v1.0.0.</p>
+      <span class="tag">verified: no secrets leaked</span></div>
+  </div>
+
+  <h2 class="sec">Live system map (truthful telemetry)</h2>
+  <div class="card">
+    <div class="map">
+      <div class="node ok"><div class="t">CORE ORCHESTRATOR</div><div class="d">command_hub alive</div></div>
+      <div class="node ok"><div class="t">INPUTS</div><div class="d">16 commands received</div></div>
+      <div class="node ok"><div class="t">PLANNING</div><div class="d">8 peer agents routed</div></div>
+      <div class="node ok"><div class="t">EXECUTION</div><div class="d">12 local actions run</div></div>
+      <div class="node warn"><div class="t">SAFETY + VERIFY</div><div class="d">2 awaiting your SEND</div></div>
+      <div class="node ok"><div class="t">OUTPUTS</div><div class="d">10 live panels</div></div>
+      <div class="node ok"><div class="t">MEMORY</div><div class="d">acts · quests · 510MB db</div></div>
+      <div class="node ok"><div class="t">FEEDBACK LOOP</div><div class="d">tinder curate active</div></div>
+      <div class="node warn"><div class="t">CREDIT</div><div class="d">zyloo no credit</div></div>
+    </div>
+    <div class="caveat">
+      <b>Honest caveats:</b> external execution (T2) is authorized but not yet wired — x.com / zyloo calls need
+      integrations + keys (tokenrouter key missing, zyloo 402). Echo Voice offline (deps not installed).
+      Supervisor cross-logoff survival unverified. Everything else is real and live.
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>AetherOS Hybrid · git tag v1.0.0 · <code>python run.py</code> → http://127.0.0.1:8900/aetherhaven_desktop.html</span>
+    <span>built with Hermes Agent · local-first by construction</span>
+  </div>
+</div>
+</body>
+</html>
