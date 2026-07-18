@@ -37,6 +37,9 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
 .tag.ok{color:var(--ok);border-color:rgba(122,252,255,.4)}
 .tag.warn{color:var(--warn);border-color:rgba(255,200,120,.4)}
 .tag.bad{color:var(--bad);border-color:rgba(255,112,136,.4)}
+.unitBtn{background:var(--bg);border:1px solid var(--line2);border-radius:7px;color:var(--dim);padding:6px 10px;font-family:var(--mono);font-size:11px;cursor:pointer}
+.unitBtn:hover{color:var(--text)}
+.unitBtn.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:700}
 .log{font-family:var(--mono);font-size:12px;line-height:1.55;max-height:300px;overflow:auto}
 .m{margin:2px 0;white-space:pre-wrap;word-break:break-word}
 .m.you{color:var(--text)}.m.agent{color:var(--violet)}.m.sys{color:var(--dim)}
@@ -75,7 +78,8 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
   <div class="tab" data-v="voice">Voice</div>
   <div class="tab" data-v="works">Works</div>
   <div class="tab" data-v="offer">Offerings</div>
-</div>
+  <div class="tab" data-v="strategy">Strategy</div>
+  </div>
 <div class="main">
   <!-- FLEET -->
   <div class="view active" id="v-fleet">
@@ -139,6 +143,28 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
       <div class="tier"><span class="nm">Spark</span><span class="pr">$25</span><span class="ds">Entry-level agent avtuber. Single voice, one persona.</span></div>
       <div class="tier"><span class="nm">Voice</span><span class="pr">$75</span><span class="ds">Full voice agent. Custom tone, memory, multi-scene.</span></div>
       <div class="tier"><span class="nm">Fleet</span><span class="pr">$200</span><span class="ds">Full fleet. Multiple agents, orchestration, live channel.</span></div>
+    </div>
+  </div>
+  <!-- STRATEGY (RTS) -->
+  <div class="view" id="v-strategy">
+    <h2 class="v">Strategy</h2>
+    <p class="v">Real-time defense of the Citadel. Enemy waves march from the edges; deploy your fleet peers as defenders. Click the field to deploy the selected unit. Absorb your game-dev DNA into one app.</p>
+    <div class="card" style="padding:10px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-family:var(--mono);font-size:12px">wave <b id="sWave">0</b></span>
+        <span style="font-family:var(--mono);font-size:12px">citadel <b id="sCit">100</b></span>
+        <span style="font-family:var(--mono);font-size:12px">score <b id="sScore">0</b></span>
+        <button id="sStart" class="tag" style="cursor:pointer;color:var(--ok);border-color:rgba(122,252,255,.4)" onclick="stratStart()">START</button>
+        <button id="sPause" class="tag" style="cursor:pointer" onclick="stratTogglePause()">PAUSE</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="unitBtn" data-u="0" onclick="setUnit(0)">Hermes · fast</button>
+        <button class="unitBtn" data-u="1" onclick="setUnit(1)">Steward · long</button>
+        <button class="unitBtn" data-u="2" onclick="setUnit(2)">AetherDeck · splash</button>
+        <button class="unitBtn" data-u="3" onclick="setUnit(3)">FairyOS · heavy</button>
+      </div>
+      <canvas id="sCanvas" width="900" height="360" style="width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#0a0710;display:block;cursor:crosshair"></canvas>
+      <div id="sMsg" style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px">Click START to defend the Citadel.</div>
     </div>
   </div>
 </div>
@@ -205,9 +231,68 @@ async function loadWorks(){try{const d=await(await fetch('./works.json')).json()
 async function loadStatus(){for(const[n,u]of [['Hub',END.hub+'/fleet'],['Cred','./credit_status.json']]){
   try{const r=await fetch(u,{cache:'no-store'});if(n==='Hub')$('dHub').className='dot'+(r.ok?'':' bad');}catch(e){if(n==='Hub')$('dHub').className='dot bad';}}}
 
-addMsg('sys','AETHER — your work, in one place. Tabs above: Fleet, Quests, Credits, Voice, Works, Offerings.');
+addMsg('sys','AETHER — your work, in one place. Tabs: Fleet, Quests, Credits, Voice, Works, Offerings, Strategy.');
 async function refresh(){await Promise.all([loadStatus(),loadOutbox(),loadQuests(),loadCredit(),loadWorks()]);}
 refresh();setInterval(refresh,12000);
+
+/* ===================== REAL-TIME STRATEGY ===================== */
+const S={canvas:null,ctx:null,running:false,paused:false,raf:0,last:0,
+  cit:100,wave:0,score:0,sel:0,enemies:[],defs:[],projs:[],spawnT:0,waveT:0,
+  W:900,H:360,cx:450,cy:180};
+const UNITS=[
+  {nm:'Hermes',col:'#7afcff',range:90,rate:18,dmg:8,rad:7,cost:0,splash:0},
+  {nm:'Steward',col:'#c9a0ff',range:150,rate:42,dmg:16,rad:8,cost:0,splash:0},
+  {nm:'AetherDeck',col:'#ff9eb5',range:110,rate:36,dmg:12,rad:9,cost:0,splash:36},
+  {nm:'FairyOS',col:'#ffd98a',range:70,rate:30,dmg:30,rad:11,cost:0,splash:0},
+];
+function stratInit(){if(S.canvas)return;S.canvas=$('sCanvas');S.ctx=S.canvas.getContext('2d');S.W=S.canvas.width;S.H=S.canvas.height;S.cx=S.W/2;S.cy=S.H/2;
+  S.canvas.addEventListener('click',e=>{const r=S.canvas.getBoundingClientRect();const x=(e.clientX-r.left)*(S.W/r.width);const y=(e.clientY-r.top)*(S.H/r.height);stratDeploy(x,y);});}
+function setUnit(i){S.sel=i;document.querySelectorAll('.unitBtn').forEach(b=>b.classList.toggle('active',+b.dataset.u===i));}
+function stratReset(){S.cit=100;S.wave=0;S.score=0;S.enemies=[];S.defs=[];S.projs=[];S.spawnT=0;S.waveT=0;stratHud();}
+function stratStart(){stratInit();S.running=true;S.paused=false;$('sPause').textContent='PAUSE';$('sStart').textContent='RESTART';stratReset();S.last=performance.now();loop();$('sMsg').textContent='Defend the Citadel. Click to deploy.';}
+function stratTogglePause(){if(!S.running)return;S.paused=!S.paused;$('sPause').textContent=S.paused?'RESUME':'PAUSE';if(!S.paused){S.last=performance.now();loop();}}
+function stratPause(){S.paused=true;$('sPause').textContent='RESUME';}
+function stratDeploy(x,y){if(!S.running||S.paused)return;const u=UNITS[S.sel];
+  // dont stack on citadel; keep within field
+  if(Math.hypot(x-S.cx,y-S.cy)<22)return;
+  S.defs.push({x,y,...u,cd:0});}
+function spawnWave(){S.wave++;const n=3+S.wave;for(let i=0;i<n;i++){const edge=Math.floor(Math.random()*4);let x,y;
+  if(edge===0){x=Math.random()*S.W;y=0;}else if(edge===1){x=Math.random()*S.W;y=S.H;}else if(edge===2){x=0;y=Math.random()*S.H;}else{x=S.W;y=Math.random()*S.H;}
+  S.enemies.push({x,y,hp:18+S.wave*4,max:18+S.wave*4,sp:0.45+S.wave*0.05,rad:9});}
+  stratHud();}
+function stratHud(){$('sWave').textContent=S.wave;$('sCit').textContent=Math.max(0,Math.round(S.cit));$('sScore').textContent=S.score;}
+function loop(){if(!S.running||S.paused)return;const now=performance.now();let dt=(now-S.last)/1000;if(dt>0.05)dt=0.05;S.last=now;update(dt);draw();S.raf=requestAnimationFrame(loop);}
+function update(dt){
+  S.spawnT+=dt;S.waveT+=dt;
+  if(S.waveT>2.5){S.waveT=0;spawnWave();}
+  // enemies move toward citadel
+  for(const e of S.enemies){const a=Math.atan2(S.cy-e.y,S.cx-e.x);e.x+=Math.cos(a)*e.sp*60*dt;e.y+=Math.sin(a)*e.sp*60*dt;
+    if(Math.hypot(e.x-S.cx,e.y-S.cy)<18){S.cit-=10;e.dead=true;if(S.cit<=0){S.cit=0;stratHud();gameOver();}}}
+  // defenders fire
+  for(const d of S.defs){d.cd-=dt*60;if(d.cd<=0){let tgt=null,best=d.range;
+    for(const e of S.enemies){if(e.dead)continue;const dist=Math.hypot(e.x-d.x,e.y-d.y);if(dist<best){best=dist;tgt=e;}}
+    if(tgt){d.cd=d.rate;S.projs.push({x:d.x,y:d.y,tx:tgt.x,ty:tgt.y,sp:340,dmg:d.dmg,splash:d.splash,col:d.col,tgt});}}}
+  // projectiles
+  for(const p of S.projs){const a=Math.atan2(p.ty-p.y,p.tx-p.x);p.x+=Math.cos(a)*p.sp*dt;p.y+=Math.sin(a)*p.sp*dt;
+    for(const e of S.enemies){if(e.dead)continue;if(Math.hypot(e.x-p.x,e.y-p.y)<e.rad+3){if(p.splash){for(const e2 of S.enemies){if(!e2.dead&&Math.hypot(e2.x-e.x,e2.y-e.y)<p.splash)e2.hp-=p.dmg;} }else e.hp-=p.dmg;
+      if(e.hp<=0&&!e.dead){e.dead=true;S.score+=10;}p.dead=true;break;}}}
+  S.enemies=S.enemies.filter(e=>!e.dead);S.projs=S.projs.filter(p=>!p.dead);
+  stratHud();
+}
+function draw(){const c=S.ctx;c.clearRect(0,0,S.W,S.H);
+  // citadel
+  c.fillStyle='#ffd98a';c.beginPath();c.arc(S.cx,S.cy,14,0,7);c.fill();
+  c.strokeStyle='rgba(255,217,138,.3)';c.beginPath();c.arc(S.cx,S.cy,18,0,7);c.stroke();
+  // defenders
+  for(const d of S.defs){c.fillStyle=d.col;c.beginPath();c.arc(d.x,d.y,d.rad,0,7);c.fill();
+    c.strokeStyle='rgba(255,255,255,.12)';c.beginPath();c.arc(d.x,d.y,d.range,0,7);c.stroke();}
+  // enemies
+  for(const e of S.enemies){c.fillStyle='#ff7088';c.beginPath();c.arc(e.x,e.y,e.rad,0,7);c.fill();
+    c.fillStyle='rgba(0,0,0,.4)';c.fillRect(e.x-10,e.y-e.rad-6,20,3);c.fillStyle='#7afcff';c.fillRect(e.x-10,e.y-e.rad-6,20*(e.hp/e.max),3);}
+  // projectiles
+  for(const p of S.projs){c.fillStyle=p.col;c.beginPath();c.arc(p.x,p.y,3,0,7);c.fill();}
+}
+function gameOver(){S.running=false;cancelAnimationFrame(S.raf);$('sMsg').textContent='Citadel fell at wave '+S.wave+'. Score '+S.score+'. Click RESTART.';$('sStart').textContent='RESTART';}
 </script>
 </body>
 </html>
