@@ -75,6 +75,7 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
   <div class="stat" id="stCredit"><span class="dot" id="dCred"></span>credit</div>
   <div class="stat" id="stPending"><span class="dot" id="dPend"></span>pending:0</div>
 </div>
+<div id="connBar" style="font-family:var(--mono);font-size:11px;padding:4px 16px;border-bottom:1px solid var(--line);color:var(--dim)">checking backends…</div>
 <div class="tabs">
   <div class="tab active" data-v="fleet">Fleet</div>
   <div class="tab" data-v="quests">Quests</div>
@@ -211,7 +212,7 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
 </div>
 
 <script>
-const END={hub:'http://127.0.0.1:8911',dispatch:'http://127.0.0.1:8912',map:'http://127.0.0.1:8913',mother:'http://127.0.0.1:8920'};
+const END={hub:'http://127.0.0.1:8911',dispatch:'http://127.0.0.1:8912',map:'http://127.0.0.1:8913',mother:'http://127.0.0.1:8920',console:'http://127.0.0.1:8914'};
 const $=id=>document.getElementById(id);
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
 function addMsg(cls,txt){const d=el('div','m '+cls);d.textContent=txt;$('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight;}
@@ -232,7 +233,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 
 // ---- AGENT TV + GAME CONSOLE ----
-const CON='http://127.0.0.1:8914';
+const CON=END.console;
 async function loadConsole(){try{
   const d=await(await fetch(CON+'/list?t='+Date.now(),{cache:'no-store'})).json();
   const c=$('consoleList');c.innerHTML='';
@@ -248,7 +249,7 @@ async function loadConsole(){try{
     const provs=cr.providers||{};const states=Object.values(provs).map(p=>p.state);
     $('cCreditMini').textContent=states.includes('with_credit')?'available':(states.includes('no_credit')?'none (zyloo 402)':'not configured');}catch(e){$('cCreditMini').textContent='unknown';}
 }catch(e){$('consoleList').innerHTML='<div class="empty">console host offline (8914)</div>';}}
-function tvLoad(key){const map={game:'http://127.0.0.1:8914/game',tv:'http://127.0.0.1:8901/',console:'http://127.0.0.1:8746/'};
+function tvLoad(key){const map={game:'http://127.0.0.1:8914/game',heart:'http://127.0.0.1:8914/heart',tv:'http://127.0.0.1:8901/',console:'http://127.0.0.1:8746/'};
   const url=map[key];if(!url){$('watchNotes').textContent='no url for '+key;$('tvFrame').src='about:blank';return;}
   $('tvFrame').src=url;$('watchNotes').textContent='watching: '+key+' → '+url+'. open it, start the agent, and read the debug stream.';}
 
@@ -346,16 +347,15 @@ async function loadCouncil(){try{
 }catch(e){$('council').innerHTML='<div class="empty">council offline</div>';}}
 async function addQuestFromText(name){try{i=$('qAdd');i.value=name;addQuest();}catch(e){}}
 
-// credits
-async function loadCredit(){try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
-  const t=d.totals||{};const sum=el('div','row');sum.appendChild(el('span',null,'total providers'));
-  sum.appendChild(el('span','tag',(t.providers||0)+' · '+(t.with_credit||0)+' credit'));c.appendChild(sum);
-  for(const[n,p]of Object.entries(d.providers||{})){const r=el('div','row');r.appendChild(el('span',null,n));
-    r.appendChild(el('span','tag '+(p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'),p.state));c.appendChild(r);}
-  const note=el('div','row');note.appendChild(el('span',null,'note'));note.appendChild(el('span','tag',d.cloud_routable?'routable':'local-first'));c.appendChild(note);
-  setCreditDot(d.totals);
-}catch(e){$('credit').innerHTML='<div class="empty">credit monitor offline</div>';}}
-function setCreditDot(t){const d=$('dCred');const st=(t&&t.with_credit>0)?'ok':(t&&t.no_credit>0?'warn':'bad');d.className='dot'+(st==='ok'?'':st==='warn'?' warn':' bad');}
+// credits (top status dot only; the full credit view moved into the TV/Console tab)
+async function loadCredit(){try{const d=await(await fetch('./credit_status.json?t='+Date.now(),{cache:'no-store'})).json();setCreditDot(d.totals);
+  const c=$('credit');if(c){c.innerHTML='';const t=d.totals||{};const sum=el('div','row');sum.appendChild(el('span',null,'total providers'));
+    sum.appendChild(el('span','tag',(t.providers||0)+' · '+(t.with_credit||0)+' credit'));c.appendChild(sum);
+    for(const[n,p]of Object.entries(d.providers||{})){const r=el('div','row');r.appendChild(el('span',null,n));
+      r.appendChild(el('span','tag '+(p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'),p.state));c.appendChild(r);}
+    const note=el('div','row');note.appendChild(el('span',null,'note'));note.appendChild(el('span','tag',d.cloud_routable?'routable':'local-first'));c.appendChild(note);}
+}catch(e){const c=$('credit');if(c)c.innerHTML='<div class="empty">credit monitor offline</div>';}}
+function setCreditDot(t){const d=$('dCred');if(!d)return;const st=(t&&t.with_credit>0)?'ok':(t&&t.no_credit>0?'warn':'bad');d.className='dot'+(st==='ok'?'':st==='warn':' bad');}
 
 // works
 async function loadWorks(){try{const d=await(await fetch('./works.json')).json();const c=$('works');c.innerHTML='';
@@ -368,8 +368,17 @@ async function loadStatus(){for(const[n,u]of [['Hub',END.hub+'/fleet'],['Cred','
   try{const r=await fetch(u,{cache:'no-store'});if(n==='Hub')$('dHub').className='dot'+(r.ok?'':' bad');}catch(e){if(n==='Hub')$('dHub').className='dot bad';}}}
 
 addMsg('sys','AETHER — your work, in one place. Tabs: Fleet, Quests, Credits, Voice, Works, Offerings, Strategy, Command.');
+async function checkBackends(){const eps=[['hub',END.hub],['dispatch',END.dispatch],['map',END.map],['console',END.console],['mother',END.mother]];
+  const out=await Promise.all(eps.map(async([n,u])=>{
+    try{const r=await fetch(u+'/health',{cache:'no-store'});return n+(r.ok?' ok':' '+r.status);}
+    catch(e){return n+' DOWN';}
+  }));
+  const down=out.filter(s=>s.endsWith('DOWN'));
+  const bar=$('connBar');if(bar){bar.textContent='backends: '+out.join(' · ');bar.style.color=down.length?'var(--bad)':'var(--ok)';}
+}
 async function refresh(){await Promise.all([loadStatus(),loadOutbox(),loadQuests(),loadCredit(),loadWorks()]);}
 refresh();setInterval(refresh,12000);
+checkBackends();setInterval(checkBackends,12000);
 
 /* ===================== STRATEGY (real control room, derived from vision.md) ===================== */
 // Frontier metrics computed from REAL endpoints. Objectives progress = real evidence.
