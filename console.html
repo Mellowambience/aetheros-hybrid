@@ -70,12 +70,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13
       <div id="sysState"><div class="empty">loading…</div></div>
     </div>
     <div class="section">
-      <h2>Credit</h2>
+      <h2>Fleet Peers</h2>
+      <div id="peers"><div class="empty">loading…</div></div>
+    </div>
+    <div class="section">
+      <h2>Credits</h2>
       <div id="credit"><div class="empty">loading…</div></div>
     </div>
     <div class="section">
-      <h2>Fleet Peers</h2>
-      <div id="peers"><div class="empty">loading…</div></div>
+      <h2>Works — your life's work</h2>
+      <div id="works"><div class="empty">indexing…</div></div>
     </div>
   </div>
 
@@ -111,12 +115,63 @@ function addMsg(cls,who,text){const d=el('div','m '+cls);if(who){const w=el('spa
 async function send(){
   const inp=$('cmd'); const t=inp.value.trim(); if(!t)return; inp.value='';
   addMsg('you','you',t);
+  const low=t.toLowerCase();
+  // local operator commands (decided direction for the sealed console)
+  if(low==='help'||low==='?') return cmdHelp();
+  if(low==='works'||low==='projects') return cmdWorks();
+  if(low.startsWith('open ')) return cmdOpen(t.slice(5).trim());
+  if(low==='credit'||low==='credits') return cmdCredit();
+  if(low==='send'||low==='send all') return cmdSendAll();
+  // otherwise: route to the fleet
   try{
     const r=await fetch(END.hub+'/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,target:$('target').value})});
     const d=await r.json();
     addMsg('agent',d.routed_to||'fleet',(d.note||'')+(d.sends?'  [held in outbox — awaiting send]':'  [routed]'));
     if(d.sends) loadOutbox();
   }catch(e){ addMsg('sys','error','hub unreachable: '+e.message); }
+}
+function cmdHelp(){
+  addMsg('sys','help','commands: works · open <name> · credit · send [all] · <anything else> routes to the fleet');
+  addMsg('sys','help','works = list every project you have built · open <name> = reveal its path · credit = all provider states');
+}
+function cmdWorks(){
+  const d=JSON.parse(localStorage.getItem('atl_works')||'{"projects":[]}');
+  if(!d.projects.length){addMsg('sys','works','no index yet — refreshing…');loadWorks();return;}
+  addMsg('sys','works',d.projects.length+' projects indexed. Use "open <name>".');
+  d.projects.slice(0,20).forEach(p=>addMsg('sys','',`  ${p.name} — ${p.desc.slice(0,70)}`));
+  if(d.projects.length>20)addMsg('sys','',`  …and ${d.projects.length-20} more`);
+}
+function cmdOpen(name){
+  const d=JSON.parse(localStorage.getItem('atl_works')||'{"projects":[]}');
+  const p=d.projects.find(x=>x.name.toLowerCase().includes(name.toLowerCase()));
+  if(!p){addMsg('sys','open',`no project matches "${name}". try "works".`);return;}
+  addMsg('sys','open',`${p.name}\n  ${p.desc}\n  path: ${p.path}\n  git: ${p.git?'yes':'no'}`);
+}
+function cmdCredit(){
+  fetch('./credit_status.json').then(r=>r.json()).then(d=>{
+    const t=d.totals||{};
+    addMsg('sys','credit',`providers: ${t.providers||0} · with credit: ${t.with_credit||0} · no credit: ${t.no_credit||0} · not configured: ${t.not_configured||0}`);
+    for(const[n,p]of Object.entries(d.providers||{}))addMsg('sys','',`  ${n}: ${p.state}`);
+    addMsg('sys','credit',d.note||'');
+  }).catch(e=>addMsg('sys','credit','credit monitor offline'));
+}
+async function cmdSendAll(){
+  try{const d=await(await fetch(END.dispatch+'/outbox')).json();
+    for(const o of (d.commands||[])){await fetch(END.dispatch+'/send/'+o.id,{method:'POST'});}
+    addMsg('sys','outbox',`sent ${d.commands.length} pending action(s)`);loadOutbox();
+  }catch(e){addMsg('sys','outbox','send failed');}
+}
+function loadWorks(){
+  fetch('./works.json').then(r=>r.json()).then(d=>{
+    localStorage.setItem('atl_works',JSON.stringify(d));
+    const c=$('works');c.innerHTML='';
+    d.projects.slice(0,30).forEach(p=>{
+      const r=el('div','peer');r.appendChild(el('span',null,p.name));
+      r.appendChild(el('span','r',(p.desc||'').slice(0,38)));
+      r.style.cursor='pointer';r.onclick=()=>cmdOpen(p.name);c.appendChild(r);
+    });
+    if(d.projects.length>30)c.appendChild(el('div','empty',`+${d.projects.length-30} more — type "works"`));
+  }).catch(e=>{$('works').innerHTML='<div class="empty">works index offline</div>';});
 }
 
 async function loadStatus(){
@@ -141,6 +196,10 @@ async function loadSys(){
 }
 async function loadCredit(){
   try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
+    const t=d.totals||{};
+    const sum=el('div','row');sum.appendChild(el('span','k','total providers'));
+    sum.appendChild(el('span','tag',''+ (t.providers||0) +' · '+ (t.with_credit||0) +' credit'));
+    c.appendChild(sum);
     for(const[n,p]of Object.entries(d.providers||{})){
       const r=el('div','row');r.appendChild(el('span','k',n));
       r.appendChild(el('span','tag '+(p.state==='credit'?'ok':p.state==='not_configured'?'warn':'bad'),p.state));c.appendChild(r);
@@ -167,7 +226,8 @@ async function sendOut(id){try{const d=await(await fetch(END.dispatch+'/send/'+i
 function setPending(n){const d=$('dPending');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
 
 addMsg('sys','console','AetherOS operator console. Command the fleet, review system state, approve pending external actions.');
-async function refresh(){await Promise.all([loadStatus(),loadSys(),loadCredit(),loadPeers(),loadOutbox()]);}
+addMsg('sys','console','type "help" for commands. "works" lists every project you have built.');
+async function refresh(){await Promise.all([loadStatus(),loadSys(),loadCredit(),loadPeers(),loadOutbox(),loadWorks()]);}
 refresh(); setInterval(refresh,10000);
 </script>
 </body>

@@ -112,6 +112,14 @@ def check_all() -> dict:
     # agent-routing summary
     any_credit = any(p.get("state") == "credit" for p in out["providers"].values())
     out["cloud_routable"] = any_credit
+    # tally across all providers (the "all credits" view — no balance is fabricated)
+    states = [p.get("state") for p in out["providers"].values()]
+    out["totals"] = {
+        "providers": len(out["providers"]),
+        "with_credit": sum(1 for s in states if s == "credit"),
+        "no_credit": sum(1 for s in states if s == "no_credit"),
+        "not_configured": sum(1 for s in states if s == "not_configured"),
+    }
     out["note"] = ("Cloud models available — agent may route via custom provider."
                    if any_credit else
                    "No cloud credit detected. Agent stays local-first until credit appears.")

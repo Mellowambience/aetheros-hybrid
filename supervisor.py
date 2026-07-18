@@ -44,6 +44,9 @@ def main():
     # 9) system map — live blueprint telemetry
     children["sysmap"] = spawn([PY, "system_map.py"], "system-map")
 
+    # 10) works indexer — converge the user's life's work into works.json (one-shot at boot)
+    spawn([PY, "works_index.py"], "works-index")
+
     if "--once" in sys.argv:
         print("[supervisor] --once: children launched; exiting.")
         return
