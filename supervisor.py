@@ -50,6 +50,9 @@ def main():
     # 11) game console — bootable console + Agent TV host on :8914
     children["gameconsole"] = spawn([PY, "game_console.py"], "game-console")
 
+    # 12) fleet pulse — keeps every alter alive with a recurring local job
+    children["pulse"] = spawn([PY, "fleet_pulse.py"], "fleet-pulse")
+
     if "--once" in sys.argv:
         print("[supervisor] --once: children launched; exiting.")
         return
@@ -79,6 +82,8 @@ def main():
                         children[name] = spawn([PY, "system_map.py"], name)
                     elif name == "gameconsole":
                         children[name] = spawn([PY, "game_console.py"], name)
+                    elif name == "pulse":
+                        children[name] = spawn([PY, "fleet_pulse.py"], name)
                     else:
                         children[name] = spawn([PY, "launcher.py"], name)
     except KeyboardInterrupt:
