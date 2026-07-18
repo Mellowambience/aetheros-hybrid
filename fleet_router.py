@@ -8,7 +8,10 @@ from __future__ import annotations
 import json, sys, datetime
 from pathlib import Path
 
-FLEET = [
+HERE = Path(__file__).resolve().parent
+
+# Built-in core peers (cannot be removed by the wizard)
+CORE_FLEET = [
     {"id":"hermes","name":"Hermes","role":"Runtime","owns":"tools, cron, gateway, memory",
      "keywords":["tool","cron","gateway","memory","delegate","schedule","run command","execute"],
      "subagent_when":"task needs isolation / parallelism / bounded context"},
@@ -35,6 +38,22 @@ FLEET = [
      "subagent_when":"fetch context from brain or steward"},
 ]
 
+def load_fleet():
+    """Core peers + any custom peers added via the wizard (fleet.json)."""
+    fleet = list(CORE_FLEET)
+    fj = HERE / "fleet.json"
+    if fj.exists():
+        try:
+            data = json.loads(fj.read_text(encoding="utf-8"))
+            for a in data.get("agents", []):
+                if isinstance(a, dict) and a.get("id") and a["id"] not in {x["id"] for x in fleet}:
+                    fleet.append(a)
+        except Exception:
+            pass
+    return fleet
+
+FLEET = load_fleet()
+
 SCOPE_NOTE = "All agents are peer-level. Hermes=runtime, Steward=observer; neither commands the others."
 
 
@@ -57,15 +76,35 @@ def route(request: str) -> dict:
 
 
 def emit_fleet_json(path: Path):
+    # Persist ONLY custom peers (added via wizard) to avoid duplicating core.
+    core_ids = {a["id"] for a in CORE_FLEET}
+    custom = [a for a in FLEET if a["id"] not in core_ids]
     payload = {
         "schema": "aetheros.fleet.v1",
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "model": "federated-peer",
-        "agents": FLEET,
+        "agents": custom,
         "note": SCOPE_NOTE,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return payload
+
+
+def add_peer(peer: dict) -> dict:
+    """Add a custom peer (from the wizard) and persist to fleet.json."""
+    if not peer.get("id") or not peer.get("name"):
+        return {"ok": False, "error": "id and name required"}
+    if peer["id"] in {a["id"] for a in CORE_FLEET}:
+        return {"ok": False, "error": "id reserved (core peer)"}
+    peer.setdefault("role", "Custom")
+    peer.setdefault("owns", "")
+    peer.setdefault("keywords", [])
+    peer.setdefault("subagent_when", "")
+    global FLEET
+    FLEET = [a for a in FLEET if a["id"] != peer["id"]]
+    FLEET.append(peer)
+    emit_fleet_json(HERE / "fleet.json")
+    return {"ok": True, "agent": peer["id"]}
 
 
 def self_test():

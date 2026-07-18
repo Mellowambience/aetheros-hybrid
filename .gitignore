@@ -27,3 +27,12 @@ legacy/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# stray artifacts dropped into dir by other tools
+_foundry_big.py
+_foundry_mid.py
+_record.py
+_shot.py
+foundry.py
+recap.html
+recap.png
