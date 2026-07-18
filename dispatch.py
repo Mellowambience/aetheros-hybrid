@@ -89,7 +89,7 @@ class H_(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        u = self.path.rstrip("/")
+        u = self.path.split("?")[0].rstrip("/")
         if u == "/health":
             self._json({"ok": True})
         elif u == "/outbox":
@@ -98,6 +98,36 @@ class H_(BaseHTTPRequestHandler):
         elif u == "/activity":
             p = HERE / "agent_activity.json"
             self._json({"activity": json.loads(p.read_text(encoding="utf-8")) if p.exists() else []})
+        elif u == "/snapshot":
+            # real pipeline state — drives the Orchestrator view + RTS enemies
+            rows = load_inbox()
+            pending, awaiting, done = [], [], []
+            for r in rows:
+                st = r.get("status")
+                rec = {"id": r.get("id"), "text": r.get("text", ""),
+                       "agent": r.get("agent_id", "hermes"), "status": st}
+                if st == "queued":
+                    pending.append(rec)
+                elif st in ("pending_send", "awaiting_send"):
+                    awaiting.append(rec)
+                elif st in ("executed", "approved_send", "error"):
+                    rec["executed_at"] = r.get("executed_at", "")
+                    done.append(rec)
+            # credit state (real)
+            cred = {}
+            cp = HERE / "credit_status.json"
+            if cp.exists():
+                try:
+                    cred = json.loads(cp.read_text(encoding="utf-8"))
+                except Exception:
+                    cred = {}
+            self._json({
+                "pending": pending, "awaiting": awaiting, "done": done,
+                "counts": {"pending": len(pending), "awaiting": len(awaiting),
+                           "done": len(done), "total": len(rows)},
+                "credit": cred,
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            })
         else:
             self.send_response(404); self.end_headers()
 

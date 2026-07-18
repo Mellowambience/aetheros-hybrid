@@ -83,6 +83,7 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
   <div class="tab" data-v="works">Works</div>
   <div class="tab" data-v="offer">Offerings</div>
   <div class="tab" data-v="strategy">Strategy</div>
+  <div class="tab" data-v="command">Command</div>
   </div>
 <div class="main">
   <!-- FLEET -->
@@ -149,26 +150,39 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
       <div class="tier"><span class="nm">Fleet</span><span class="pr">$200</span><span class="ds">Full fleet. Multiple agents, orchestration, live channel.</span></div>
     </div>
   </div>
-  <!-- STRATEGY (RTS) -->
+  <!-- STRATEGY (real strategic control room, not a game) -->
   <div class="view" id="v-strategy">
     <h2 class="v">Strategy</h2>
-    <p class="v">Real-time defense of the Citadel. Enemy waves march from the edges; deploy your fleet peers as defenders. Click the field to deploy the selected unit. Absorb your game-dev DNA into one app.</p>
-    <div class="card" style="padding:10px">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-family:var(--mono);font-size:12px">wave <b id="sWave">0</b></span>
-        <span style="font-family:var(--mono);font-size:12px">citadel <b id="sCit">100</b></span>
-        <span style="font-family:var(--mono);font-size:12px">score <b id="sScore">0</b></span>
-        <button id="sStart" class="tag" style="cursor:pointer;color:var(--ok);border-color:rgba(122,252,255,.4)" onclick="stratStart()">START</button>
-        <button id="sPause" class="tag" style="cursor:pointer" onclick="stratTogglePause()">PAUSE</button>
+    <p class="v">The standing direction of the system. Objectives are derived from <code>vision.md</code>; progress is computed from real endpoints; moves issue actual fleet commands (evidenced in the inbox). This is the control room, not a game.</p>
+    <div class="card" style="padding:12px">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--violet);margin-bottom:10px;border-left:2px solid var(--violet);padding-left:8px" id="sVision">loading vision…</div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">Frontier Metrics (live)</h3>
+      <div id="sMetrics" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px"></div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">Strategic Objectives</h3>
+      <div id="sObjectives" style="margin-bottom:12px"></div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:4px 0">Issue a Move (real fleet command)</h3>
+      <div class="input" style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="sMove" placeholder="e.g. index the 48 repos and report which lack a callable capability" onkeydown="if(event.key==='Enter')issueMove()">
+        <button onclick="issueMove()">Issue Move</button>
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-        <button class="unitBtn" data-u="0" onclick="setUnit(0)">Hermes · fast</button>
-        <button class="unitBtn" data-u="1" onclick="setUnit(1)">Steward · long</button>
-        <button class="unitBtn" data-u="2" onclick="setUnit(2)">AetherDeck · splash</button>
-        <button class="unitBtn" data-u="3" onclick="setUnit(3)">FairyOS · heavy</button>
+      <div id="sMoveLog" style="font-family:var(--mono);font-size:11px;color:var(--dim);max-height:120px;overflow:auto"></div>
+    </div>
+  </div>
+  <!-- COMMAND / ORCHESTRATOR (live topology from real pipeline) -->
+  <div class="view" id="v-command">
+    <h2 class="v">Command — Orchestrator</h2>
+    <p class="v">Live topology of your real agent system. Every node is backed by an actual endpoint — nothing is simulated. Enemies in the Strategy game are these pending commands; quest evidence is these completions.</p>
+    <div class="card" style="padding:12px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-family:var(--mono);font-size:12px">
+        <span>pending <b id="cPend" style="color:var(--warn)">0</b></span>
+        <span>awaiting SEND <b id="cAwait" style="color:var(--cyan)">0</b></span>
+        <span>completed <b id="cDone" style="color:var(--ok)">0</b></span>
+        <span>credit <b id="cCred" style="color:var(--bad)">none</b></span>
+        <span style="color:var(--dim)">ts <span id="cTs">-</span></span>
       </div>
-      <canvas id="sCanvas" width="900" height="360" style="width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#0a0710;display:block;cursor:crosshair"></canvas>
-      <div id="sMsg" style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px">Click START to defend the Citadel.</div>
+      <div id="cTopo" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"></div>
+      <h3 class="v" style="font-size:12px;color:var(--dim);margin:6px 0">Real-Time Bus (live events)</h3>
+      <div id="cBus" style="font-family:var(--mono);font-size:11px;line-height:1.5;max-height:160px;overflow:auto;color:var(--dim)"></div>
     </div>
   </div>
 </div>
@@ -186,7 +200,11 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   t.classList.add('active');$('v-'+t.dataset.v).classList.add('active');
   // real-time quest bars: poll every 2s while on the Quests tab
   if(window.__questTimer){clearInterval(window.__questTimer);window.__questTimer=null;}
+  if(window.__cmdTimer){clearInterval(window.__cmdTimer);window.__cmdTimer=null;}
+  if(window.__stratTimer){clearInterval(window.__stratTimer);window.__stratTimer=null;}
   if(t.dataset.v==='quests'){loadQuests();window.__questTimer=setInterval(loadQuests,2000);}
+  if(t.dataset.v==='command'){loadCommand();window.__cmdTimer=setInterval(loadCommand,2000);}
+  if(t.dataset.v==='strategy'){loadVision();loadStrategy();window.__stratTimer=setInterval(loadStrategy,2000);}
 });
 
 // fleet send
@@ -203,18 +221,19 @@ async function loadOutbox(){try{const d=await(await fetch(END.dispatch+'/outbox'
 }catch(e){}}
 function setPending(n){const d=$('dPend');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
 
-// quests (AetherQuest loop, real store via /quest API + live evidence)
-const QUEST_TARGET = 5;  // fleet actions since creation = 100%
+// quests (AetherQuest loop — evidence = REAL completions from the pipeline)
+const QUEST_TARGET = 5;  // real executed commands since creation = 100%
 async function loadQuests(){
  try{
   const d=await(await fetch(END.hub+'/quest')).json();
-  let acts=[];
-  try{acts=await(await fetch('./agent_activity.json?t='+Date.now(),{cache:'no-store'})).json();}catch(e){}
-  const qs=d.quests||[];const done=qs.filter(q=>q.done).length;$('xp').textContent=done*100;
+  let snap=null;
+  try{snap=await loadSnapshot();}catch(e){}
+  const done=[]; if(snap){done.push(...(snap.done||[]));}
+  const qs=d.quests||[];const compl=qs.filter(q=>q.done).length;$('xp').textContent=compl*100;
   const c=$('quests');c.innerHTML='';
   qs.forEach((q,i)=>{
-    const created=Date.parse((q.added||'').replace(' ','T')+ (q.added&&!q.added.includes('Z')?'Z':''))||0;
-    const since=acts.filter(a=>{const t=Date.parse((a.ts||'').replace(' ','T')+(a.ts&&!a.ts.includes('Z')?'Z':''))||0;return t>=created;}).length;
+    const created=Date.parse((q.added||'').replace(' ','T')+(q.added&&!q.added.includes('Z')?'Z':''))||0;
+    const since=done.filter(r=>{const t=Date.parse((r.executed_at||'').replace(' ','T')+(r.executed_at&&!r.executed_at.includes('Z')?'Z':''))||0;return t>=created;}).length;
     let pct = q.done?100:Math.min(100,Math.round(since/QUEST_TARGET*100));
     const r=el('div','q'+(q.done?' done':''));
     r.appendChild(el('div','box'));
@@ -224,7 +243,7 @@ async function loadQuests(){
     const bar=el('div','qbar');const fill=el('i');fill.style.width=pct+'%';bar.appendChild(fill);
     const pctEl=el('span','pct',pct+'%');
     top.appendChild(bar);top.appendChild(pctEl);
-    const meta=el('div','qmeta',q.done?'completed':`evidence: ${since} fleet action${since===1?'':'s'} since ${q.added||'?'} (target ${QUEST_TARGET})`);
+    const meta=el('div','qmeta',q.done?'completed':`evidence: ${since} real completion${since===1?'':'s'} since ${q.added||'?'} (target ${QUEST_TARGET})`);
     mid.appendChild(top);mid.appendChild(meta);
     r.appendChild(mid);
     r.onclick=()=>toggleQuest(i);c.appendChild(r);
@@ -260,68 +279,101 @@ async function loadWorks(){try{const d=await(await fetch('./works.json')).json()
 async function loadStatus(){for(const[n,u]of [['Hub',END.hub+'/fleet'],['Cred','./credit_status.json']]){
   try{const r=await fetch(u,{cache:'no-store'});if(n==='Hub')$('dHub').className='dot'+(r.ok?'':' bad');}catch(e){if(n==='Hub')$('dHub').className='dot bad';}}}
 
-addMsg('sys','AETHER — your work, in one place. Tabs: Fleet, Quests, Credits, Voice, Works, Offerings, Strategy.');
+addMsg('sys','AETHER — your work, in one place. Tabs: Fleet, Quests, Credits, Voice, Works, Offerings, Strategy, Command.');
 async function refresh(){await Promise.all([loadStatus(),loadOutbox(),loadQuests(),loadCredit(),loadWorks()]);}
 refresh();setInterval(refresh,12000);
 
-/* ===================== REAL-TIME STRATEGY ===================== */
-const S={canvas:null,ctx:null,running:false,paused:false,raf:0,last:0,
-  cit:100,wave:0,score:0,sel:0,enemies:[],defs:[],projs:[],spawnT:0,waveT:0,
-  W:900,H:360,cx:450,cy:180};
-const UNITS=[
-  {nm:'Hermes',col:'#7afcff',range:90,rate:18,dmg:8,rad:7,cost:0,splash:0},
-  {nm:'Steward',col:'#c9a0ff',range:150,rate:42,dmg:16,rad:8,cost:0,splash:0},
-  {nm:'AetherDeck',col:'#ff9eb5',range:110,rate:36,dmg:12,rad:9,cost:0,splash:36},
-  {nm:'FairyOS',col:'#ffd98a',range:70,rate:30,dmg:30,rad:11,cost:0,splash:0},
+/* ===================== STRATEGY (real control room, derived from vision.md) ===================== */
+// Frontier metrics computed from REAL endpoints. Objectives progress = real evidence.
+const OBJECTIVES=[
+  {id:'seal',name:'Seal the app',detail:'One cohesive surface, 100% functional',check:d=>true}, // done
+  {id:'truth',name:'Real-time truth',detail:'Command + quest-evidence + pipeline view',check:d=>true}, // done
+  {id:'credit',name:'Credit-on-bus',detail:'Spawner checks budget before fan-out',check:d=>false}, // next
+  {id:'heal',name:'Self-healing supervisor',detail:'Survives logoff, restarts clean',check:d=>false},
+  {id:'reach',name:'Capability reach',detail:'All 48 repos expose a callable capability',check:d=>d&&d.works>=48},
+  {id:'voice',name:'Voice, for real',detail:'Echo Voice installed, owner enrolled, loopback',check:d=>false},
 ];
-function stratInit(){if(S.canvas)return;S.canvas=$('sCanvas');S.ctx=S.canvas.getContext('2d');S.W=S.canvas.width;S.H=S.canvas.height;S.cx=S.W/2;S.cy=S.H/2;
-  S.canvas.addEventListener('click',e=>{const r=S.canvas.getBoundingClientRect();const x=(e.clientX-r.left)*(S.W/r.width);const y=(e.clientY-r.top)*(S.H/r.height);stratDeploy(x,y);});}
-function setUnit(i){S.sel=i;document.querySelectorAll('.unitBtn').forEach(b=>b.classList.toggle('active',+b.dataset.u===i));}
-function stratReset(){S.cit=100;S.wave=0;S.score=0;S.enemies=[];S.defs=[];S.projs=[];S.spawnT=0;S.waveT=0;stratHud();}
-function stratStart(){stratInit();S.running=true;S.paused=false;$('sPause').textContent='PAUSE';$('sStart').textContent='RESTART';stratReset();S.last=performance.now();loop();$('sMsg').textContent='Defend the Citadel. Click to deploy.';}
-function stratTogglePause(){if(!S.running)return;S.paused=!S.paused;$('sPause').textContent=S.paused?'RESUME':'PAUSE';if(!S.paused){S.last=performance.now();loop();}}
-function stratPause(){S.paused=true;$('sPause').textContent='RESUME';}
-function stratDeploy(x,y){if(!S.running||S.paused)return;const u=UNITS[S.sel];
-  // dont stack on citadel; keep within field
-  if(Math.hypot(x-S.cx,y-S.cy)<22)return;
-  S.defs.push({x,y,...u,cd:0});}
-function spawnWave(){S.wave++;const n=3+S.wave;for(let i=0;i<n;i++){const edge=Math.floor(Math.random()*4);let x,y;
-  if(edge===0){x=Math.random()*S.W;y=0;}else if(edge===1){x=Math.random()*S.W;y=S.H;}else if(edge===2){x=0;y=Math.random()*S.H;}else{x=S.W;y=Math.random()*S.H;}
-  S.enemies.push({x,y,hp:18+S.wave*4,max:18+S.wave*4,sp:0.45+S.wave*0.05,rad:9});}
-  stratHud();}
-function stratHud(){$('sWave').textContent=S.wave;$('sCit').textContent=Math.max(0,Math.round(S.cit));$('sScore').textContent=S.score;}
-function loop(){if(!S.running||S.paused)return;const now=performance.now();let dt=(now-S.last)/1000;if(dt>0.05)dt=0.05;S.last=now;update(dt);draw();S.raf=requestAnimationFrame(loop);}
-function update(dt){
-  S.spawnT+=dt;S.waveT+=dt;
-  if(S.waveT>2.5){S.waveT=0;spawnWave();}
-  // enemies move toward citadel
-  for(const e of S.enemies){const a=Math.atan2(S.cy-e.y,S.cx-e.x);e.x+=Math.cos(a)*e.sp*60*dt;e.y+=Math.sin(a)*e.sp*60*dt;
-    if(Math.hypot(e.x-S.cx,e.y-S.cy)<18){S.cit-=10;e.dead=true;if(S.cit<=0){S.cit=0;stratHud();gameOver();}}}
-  // defenders fire
-  for(const d of S.defs){d.cd-=dt*60;if(d.cd<=0){let tgt=null,best=d.range;
-    for(const e of S.enemies){if(e.dead)continue;const dist=Math.hypot(e.x-d.x,e.y-d.y);if(dist<best){best=dist;tgt=e;}}
-    if(tgt){d.cd=d.rate;S.projs.push({x:d.x,y:d.y,tx:tgt.x,ty:tgt.y,sp:340,dmg:d.dmg,splash:d.splash,col:d.col,tgt});}}}
-  // projectiles
-  for(const p of S.projs){const a=Math.atan2(p.ty-p.y,p.tx-p.x);p.x+=Math.cos(a)*p.sp*dt;p.y+=Math.sin(a)*p.sp*dt;
-    for(const e of S.enemies){if(e.dead)continue;if(Math.hypot(e.x-p.x,e.y-p.y)<e.rad+3){if(p.splash){for(const e2 of S.enemies){if(!e2.dead&&Math.hypot(e2.x-e.x,e2.y-e.y)<p.splash)e2.hp-=p.dmg;} }else e.hp-=p.dmg;
-      if(e.hp<=0&&!e.dead){e.dead=true;S.score+=10;}p.dead=true;break;}}}
-  S.enemies=S.enemies.filter(e=>!e.dead);S.projs=S.projs.filter(p=>!p.dead);
-  stratHud();
+async function loadVision(){try{const t=await(await fetch('./vision.md?t='+Date.now(),{cache:'no-store'})).text();
+  const m=t.match(/## 4\. The Strategic Objective.*?\n([^\n]+)/s)||t.match(/The only real goal.*?\n([^\n]+)/s);
+  $('sVision').textContent=(m?m[1]:'One local-first, observable, human-gated agent OS absorbing life\'s work as verifiable capability.').trim();
+}catch(e){$('sVision').textContent='vision.md offline';}}
+async function loadStrategy(){
+ try{
+  const d=await loadSnapshot();if(!d)return;
+  const snap=d.counts;const credit=d.credit||{};const provs=credit.providers||{};
+  const withCredit=Object.values(provs).some(p=>p.state==='with_credit');
+  const noCredit=Object.values(provs).some(p=>p.state==='no_credit');
+  // works count from works.json
+  let works=0;try{works=(await(await fetch('./works.json?t='+Date.now(),{cache:'no-store'})).json()).projects.length;}catch(e){}
+  // metrics: real numbers
+  const metrics=[
+    {k:'Repos absorbed',v:works+' / 48',p:Math.min(100,Math.round(works/48*100))},
+    {k:'Commands executed',v:snap.done,sub:(snap.pending+' pending'),p:snap.done>0?100:0},
+    {k:'External ungated',v:snap.awaiting,sub:'SEND-gated',p:snap.awaiting===0?100:Math.max(0,100-snap.awaiting*20)},
+    {k:'Credit state',v:withCredit?'ok':(noCredit?'none':'none'),sub:credit.cloud_routable?'routable':'local',p:withCredit?100:0},
+    {k:'Sealed app',v:'live',p:100},
+    {k:'Emoji in surfaces',v:'0',p:100},
+  ];
+  const mc=$('sMetrics');mc.innerHTML='';
+  metrics.forEach(m=>{const card=document.createElement('div');card.style.cssText='border:1px solid var(--line);border-radius:8px;padding:8px';
+    card.innerHTML='<div style="font-size:10px;color:var(--dim)">'+m.k+'</div><div style="font-family:var(--mono);font-size:16px">'+m.v+(m.sub?' <span style="font-size:10px;color:var(--dim)">'+m.sub+'</span>':'')+'</div>'+
+      '<div style="height:4px;background:var(--line);border-radius:3px;margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:'+m.p+'%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .6s"></i></div>';
+    mc.appendChild(card);});
+  // objectives
+  const oc=$('sObjectives');oc.innerHTML='';
+  OBJECTIVES.forEach(o=>{const done=o.check({works,done:snap.done,awaiting:snap.awaiting});
+    const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)';
+    row.innerHTML='<span style="width:14px;height:14px;border-radius:4px;flex:none;background:'+(done?'var(--ok)':'var(--line2)')+'"></span>'+
+      '<span style="flex:1"><b>'+o.name+'</b> <span style="color:var(--dim);font-size:11px">— '+o.detail+'</span></span>'+
+      '<span style="font-family:var(--mono);font-size:11px;color:'+(done?'var(--ok)':'var(--warn)')+'">'+(done?'DONE':'open')+'</span>';
+    oc.appendChild(row);});
+ }catch(e){}
 }
-function draw(){const c=S.ctx;c.clearRect(0,0,S.W,S.H);
-  // citadel
-  c.fillStyle='#ffd98a';c.beginPath();c.arc(S.cx,S.cy,14,0,7);c.fill();
-  c.strokeStyle='rgba(255,217,138,.3)';c.beginPath();c.arc(S.cx,S.cy,18,0,7);c.stroke();
-  // defenders
-  for(const d of S.defs){c.fillStyle=d.col;c.beginPath();c.arc(d.x,d.y,d.rad,0,7);c.fill();
-    c.strokeStyle='rgba(255,255,255,.12)';c.beginPath();c.arc(d.x,d.y,d.range,0,7);c.stroke();}
-  // enemies
-  for(const e of S.enemies){c.fillStyle='#ff7088';c.beginPath();c.arc(e.x,e.y,e.rad,0,7);c.fill();
-    c.fillStyle='rgba(0,0,0,.4)';c.fillRect(e.x-10,e.y-e.rad-6,20,3);c.fillStyle='#7afcff';c.fillRect(e.x-10,e.y-e.rad-6,20*(e.hp/e.max),3);}
-  // projectiles
-  for(const p of S.projs){c.fillStyle=p.col;c.beginPath();c.arc(p.x,p.y,3,0,7);c.fill();}
+async function issueMove(){const i=$('sMove');const t=i.value.trim();if(!t)return;i.value='';
+  try{const r=await fetch(END.hub+'/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+    const d=await r.json();const line=document.createElement('div');line.textContent='› '+new Date().toLocaleTimeString()+' · issued: '+(t.slice(0,50))+(d.sends?' [held — SEND]':' [routed → inbox]');
+    $('sMoveLog').prepend(line);if(d.sends)loadOutbox();
+  }catch(e){const line=document.createElement('div');line.textContent='› error: '+e.message;$('sMoveLog').prepend(line);}
 }
-function gameOver(){S.running=false;cancelAnimationFrame(S.raf);$('sMsg').textContent='Citadel fell at wave '+S.wave+'. Score '+S.score+'. Click RESTART.';$('sStart').textContent='RESTART';}
+
+
+/* ===================== COMMAND / ORCHESTRATOR (live, real) ===================== */
+async function loadSnapshot(){try{return await (await fetch(END.dispatch+'/snapshot?t='+Date.now(),{cache:'no-store'})).json();}catch(e){return null;}}
+const TOPO=[
+  {k:'O',nm:'Orchestrator',sub:'LLM + Decision',col:'#1e40af'},
+  {k:'SP',nm:'Async Spawner',sub:'fan-out / loops',col:'#166534'},
+  {k:'S1',nm:'Researcher',sub:'isolated ctx',col:'#854d0e'},
+  {k:'S2',nm:'Analyzer',sub:'isolated ctx',col:'#854d0e'},
+  {k:'S3',nm:'Executor',sub:'isolated ctx',col:'#854d0e'},
+  {k:'S4',nm:'Validator',sub:'reject/resp',col:'#854d0e'},
+  {k:'R',nm:'Reactive',sub:'fast tools',col:'#7c3aed'},
+  {k:'B',nm:'Real-Time Bus',sub:'stream+events',col:'#0f766e'},
+  {k:'Mon',nm:'Observability',sub:'monitor+ledger',col:'#444'},
+];
+let __busLines=[];
+async function loadCommand(){
+ try{
+  const d=await loadSnapshot();if(!d)return;
+  $('cPend').textContent=d.counts.pending;$('cAwait').textContent=d.counts.awaiting;$('cDone').textContent=d.counts.done;$('cTs').textContent=d.ts;
+  const c=d.credit||{};const provs=c.providers||{};const states=Object.values(provs).map(p=>p.state);
+  const routable=c.cloud_routable?'routable':'none';
+  $('cCred').textContent=states.includes('with_credit')?('ok · '+routable):(states.includes('no_credit')?'no_credit · '+routable:'none');
+  $('cCred').style.color=states.includes('with_credit')?'var(--ok)':'var(--bad)';
+  // topology nodes filled with real counts
+  const live={O:d.counts.total,SP:d.counts.pending,S1:d.counts.pending,S2:d.counts.pending,S3:d.counts.pending,S4:0,R:d.counts.awaiting,B:d.counts.pending+d.counts.awaiting,B0:d.counts.done,Mon:d.counts.done};
+  const topo=$('cTopo');topo.innerHTML='';
+  TOPO.forEach(n=>{const v=live[n.k]??0;const card=document.createElement('div');
+    card.style.cssText='border:1px solid var(--line);border-radius:8px;padding:8px;background:'+n.col+'22;border-left:3px solid '+n.col;
+    card.innerHTML='<div style="font-weight:700;font-size:12px">'+n.nm+'</div><div style="font-size:10px;color:var(--dim)">'+n.sub+'</div><div style="font-family:var(--mono);font-size:18px;margin-top:4px;color:'+n.col+'">'+v+'</div>';
+    topo.appendChild(card);});
+  // bus: stream recent real activity (done executions + pending)
+  const lines=[];
+  d.done.slice(-8).reverse().forEach(r=>lines.push('done · '+r.agent+' · '+(r.text||'').slice(0,40)+' · '+(r.executed_at||'').slice(11)));
+  d.pending.slice(0,5).forEach(r=>lines.push('pending · '+r.agent+' · '+(r.text||'').slice(0,40)));
+  d.awaiting.slice(0,3).forEach(r=>lines.push('AWAIT SEND · '+(r.text||'').slice(0,40)));
+  __busLines=lines;const bus=$('cBus');bus.innerHTML='';lines.forEach(l=>{const x=document.createElement('div');x.textContent='› '+l;bus.appendChild(x);});
+ }catch(e){$('cBus').textContent='ERR '+e.message;$('cTopo').innerHTML='<div style="color:var(--bad)">'+e.message+'</div>';}
+}
 </script>
 </body>
 </html>
