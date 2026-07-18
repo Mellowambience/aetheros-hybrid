@@ -47,10 +47,14 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
 .input input{flex:1;background:var(--bg);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:9px 11px;font-family:var(--mono);font-size:12px;outline:none}
 .input input:focus{border-color:var(--accent)}
 .input button{background:var(--accent);color:#0e0a14;border:none;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
-.q{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;font-family:var(--mono);font-size:12px}
+.q{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;font-family:var(--mono);font-size:12px;cursor:pointer}
 .q .box{width:16px;height:16px;border:1.5px solid var(--line2);border-radius:4px;flex:none}
 .q.done .box{background:var(--violet);border-color:var(--violet)}
 .q.done span{text-decoration:line-through;color:var(--dim)}
+.qbar{flex:1;height:6px;background:var(--line);border-radius:4px;overflow:hidden;position:relative}
+.qbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--violet));border-radius:4px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.q .pct{font-size:10px;color:var(--dim);min-width:30px;text-align:right}
+.qmeta{font-size:9px;color:var(--dim);margin-top:2px;font-family:var(--mono)}
 .xp{font-size:30px;font-weight:700;color:var(--gold);font-family:var(--mono)}
 .tier{display:flex;flex-direction:column;gap:2px;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
 .tier .nm{font-weight:700;color:var(--accent)}
@@ -180,6 +184,9 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');$('v-'+t.dataset.v).classList.add('active');
+  // real-time quest bars: poll every 2s while on the Quests tab
+  if(window.__questTimer){clearInterval(window.__questTimer);window.__questTimer=null;}
+  if(t.dataset.v==='quests'){loadQuests();window.__questTimer=setInterval(loadQuests,2000);}
 });
 
 // fleet send
@@ -196,13 +203,35 @@ async function loadOutbox(){try{const d=await(await fetch(END.dispatch+'/outbox'
 }catch(e){}}
 function setPending(n){const d=$('dPend');d.className='dot'+(n>0?' warn':'');$('stPending').lastChild.textContent='pending:'+n;}
 
-// quests (AetherQuest loop, real store via /quest API)
-async function loadQuests(){try{const d=await(await fetch(END.hub+'/quest')).json();const c=$('quests');c.innerHTML='';
+// quests (AetherQuest loop, real store via /quest API + live evidence)
+const QUEST_TARGET = 5;  // fleet actions since creation = 100%
+async function loadQuests(){
+ try{
+  const d=await(await fetch(END.hub+'/quest')).json();
+  let acts=[];
+  try{acts=await(await fetch('./agent_activity.json?t='+Date.now(),{cache:'no-store'})).json();}catch(e){}
   const qs=d.quests||[];const done=qs.filter(q=>q.done).length;$('xp').textContent=done*100;
-  qs.forEach((q,i)=>{const r=el('div','q'+(q.done?' done':''));r.appendChild(el('div','box'));
-    r.appendChild(el('span',null,q.name));r.onclick=()=>toggleQuest(i);c.appendChild(r);});
+  const c=$('quests');c.innerHTML='';
+  qs.forEach((q,i)=>{
+    const created=Date.parse((q.added||'').replace(' ','T')+ (q.added&&!q.added.includes('Z')?'Z':''))||0;
+    const since=acts.filter(a=>{const t=Date.parse((a.ts||'').replace(' ','T')+(a.ts&&!a.ts.includes('Z')?'Z':''))||0;return t>=created;}).length;
+    let pct = q.done?100:Math.min(100,Math.round(since/QUEST_TARGET*100));
+    const r=el('div','q'+(q.done?' done':''));
+    r.appendChild(el('div','box'));
+    const mid=el('div');mid.style.flex='1';mid.style.minWidth='0';
+    const top=el('div');top.style.display='flex';top.style.alignItems='center';top.style.gap='8px';
+    top.appendChild(el('span',null,q.name));
+    const bar=el('div','qbar');const fill=el('i');fill.style.width=pct+'%';bar.appendChild(fill);
+    const pctEl=el('span','pct',pct+'%');
+    top.appendChild(bar);top.appendChild(pctEl);
+    const meta=el('div','qmeta',q.done?'completed':`evidence: ${since} fleet action${since===1?'':'s'} since ${q.added||'?'} (target ${QUEST_TARGET})`);
+    mid.appendChild(top);mid.appendChild(meta);
+    r.appendChild(mid);
+    r.onclick=()=>toggleQuest(i);c.appendChild(r);
+  });
   if(!qs.length)c.innerHTML='<div class="empty">no quests yet — add one below</div>';
-}catch(e){$('quests').innerHTML='<div class="empty">quest store offline</div>';}}
+ }catch(e){$('quests').innerHTML='<div class="empty">quest store offline</div>';}
+}
 async function addQuest(){const i=$('qAdd');const t=i.value.trim();if(!t)return;i.value='';
   try{const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name:t})})).json();
     if(d.ok)loadQuests();else addMsg('sys','quest error: '+(d.error||'unknown'));}catch(e){addMsg('sys','cannot reach quest API');}}
