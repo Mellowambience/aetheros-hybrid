@@ -103,11 +103,15 @@ p.v{margin:0 0 16px;color:var(--dim);font-size:12px;line-height:1.5}
   <!-- QUESTS -->
   <div class="view" id="v-quests">
     <h2 class="v">Quests</h2>
-    <p class="v">Your real actions become quests. Complete them to earn XP. (AetherQuest loop)</p>
+    <p class="v">Real actions become quests. Two lanes: <b style="color:var(--warn)">Needs Approval</b> (your sign-off) and <b style="color:var(--ok)">Automatable</b> (the agent can run it). Agent initiatives surface below.</p>
     <div class="card">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
         <span class="xp" id="xp">0</span><span style="color:var(--dim);font-size:11px">XP</span>
+        <button class="tag" style="cursor:pointer;margin-left:auto" onclick="proposeInitiatives()">+ Agent Propose</button>
       </div>
+      <h3 class="v" style="font-size:11px;color:var(--warn);margin:8px 0 4px">Needs Your Approval</h3>
+      <div id="questsAppr"></div>
+      <h3 class="v" style="font-size:11px;color:var(--ok);margin:10px 0 4px">Automatable / Yours</h3>
       <div id="quests"></div>
       <div class="input">
         <input id="qAdd" placeholder="add a quest…" onkeydown="if(event.key==='Enter')addQuest()">
@@ -268,7 +272,8 @@ async function loadQuests(){
   try{snap=await loadSnapshot();}catch(e){}
   const done=[]; if(snap){done.push(...(snap.done||[]));}
   const qs=d.quests||[];const compl=qs.filter(q=>q.done).length;$('xp').textContent=compl*100;
-  const c=$('quests');c.innerHTML='';
+  const cAppr=$('questsAppr');const cAuto=$('quests');cAppr.innerHTML='';cAuto.innerHTML='';
+  let apprN=0;
   qs.forEach((q,i)=>{
     const created=Date.parse((q.added||'').replace(' ','T')+(q.added&&!q.added.includes('Z')?'Z':''))||0;
     const since=done.filter(r=>{const t=Date.parse((r.executed_at||'').replace(' ','T')+(r.executed_at&&!r.executed_at.includes('Z')?'Z':''))||0;return t>=created;}).length;
@@ -277,24 +282,40 @@ async function loadQuests(){
     r.appendChild(el('div','box'));
     const mid=el('div');mid.style.flex='1';mid.style.minWidth='0';
     const top=el('div');top.style.display='flex';top.style.alignItems='center';top.style.gap='8px';
-    top.appendChild(el('span',null,q.name));
+    const nm=el('span',null,q.name);top.appendChild(nm);
+    if(q.proposed_by==='agent'){const tag=el('span','tag','agent idea');tag.style.cssText='font-size:10px;color:var(--violet);border-color:rgba(201,160,255,.4)';top.appendChild(tag);}
+    if(q.kind==='initiative'){const tag=el('span','tag','initiative');tag.style.cssText='font-size:10px;color:var(--cyan);border-color:rgba(122,252,255,.4)';top.appendChild(tag);}
     const bar=el('div','qbar');const fill=el('i');fill.style.width=pct+'%';bar.appendChild(fill);
     const pctEl=el('span','pct',pct+'%');
     top.appendChild(bar);top.appendChild(pctEl);
     const meta=el('div','qmeta',q.done?'completed':`evidence: ${since} real completion${since===1?'':'s'} since ${q.added||'?'} (target ${QUEST_TARGET})`);
     mid.appendChild(top);mid.appendChild(meta);
     r.appendChild(mid);
-    r.onclick=()=>toggleQuest(i);c.appendChild(r);
+    // lane: approval quests get an Approve button; others toggle on click
+    if(q.lane==='approval' && !q.approved){
+      apprN++;const b=el('button','tag warn','Approve');b.style.cursor='pointer';
+      b.onclick=(e)=>{e.stopPropagation();approveQuest(q.name);};
+      r.appendChild(b);r.onclick=null;cAppr.appendChild(r);
+    } else {
+      r.onclick=()=>toggleQuest(i);cAuto.appendChild(r);
+    }
   });
-  if(!qs.length)c.innerHTML='<div class="empty">no quests yet — add one below</div>';
+  if(!cAppr.children.length)cAppr.innerHTML='<div class="empty">nothing needs your sign-off</div>';
+  if(!cAuto.children.length)cAuto.innerHTML='<div class="empty">no automatable quests yet — add one or hit + Agent Propose</div>';
  }catch(e){$('quests').innerHTML='<div class="empty">quest store offline</div>';}
 }
 async function addQuest(){const i=$('qAdd');const t=i.value.trim();if(!t)return;i.value='';
-  try{const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name:t})})).json();
+  try{const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name:t,lane:'auto',proposed_by:'you'})})).json();
     if(d.ok)loadQuests();else addMsg('sys','quest error: '+(d.error||'unknown'));}catch(e){addMsg('sys','cannot reach quest API');}}
 async function toggleQuest(i){try{const qs=(await(await fetch(END.hub+'/quest')).json()).quests||[];const name=qs[i]&&qs[i].name;if(!name)return;
   const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'toggle',name:name})})).json();
   if(d.ok)loadQuests();}catch(e){}}
+async function approveQuest(name){try{
+  const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'approve',name:name})})).json();
+  if(d.ok){loadQuests();addMsg('sys','approved: '+name+' — agent can now run it');}else addMsg('sys','approve failed: '+(d.error||''));}catch(e){}}
+async function proposeInitiatives(){try{
+  const d=await(await fetch(END.hub+'/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'propose'})})).json();
+  if(d.ok){loadQuests();addMsg('agent','proposed '+(d.made||[]).length+' initiative(s) from your repos');}else addMsg('sys','propose failed: '+(d.error||''));}catch(e){addMsg('sys','cannot reach quest API');}}
 
 // credits
 async function loadCredit(){try{const d=await(await fetch('./credit_status.json')).json();const c=$('credit');c.innerHTML='';
